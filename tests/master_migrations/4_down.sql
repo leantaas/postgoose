@@ -1,0 +1,1 @@
+delete from zs_main;

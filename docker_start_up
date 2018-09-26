@@ -1,0 +1,20 @@
+#!/usr/bin/env python
+import os
+
+cmd = '/opt/leantaas/goose'
+
+if 'DB_HOST' in os.environ:
+    cmd += f" --host={os.environ['DB_HOST']} "
+
+if 'DB_PORT' in os.environ:
+    cmd += f" --port={os.environ['DB_PORT']} "
+
+if 'DB_USER' in os.environ:
+    cmd += f" --username={os.environ['DB_USER']} "
+
+if 'DB_NAME' in os.environ:
+    cmd += f" --dbname={os.environ['DB_NAME']} "
+
+cmd += ' migrations'
+
+os.system(cmd)
