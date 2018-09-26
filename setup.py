@@ -10,13 +10,13 @@ from shutil import rmtree
 from setuptools import find_packages, setup, Command
 
 
-NAME = 'PostGoose'
+NAME = 'postgoose'
 DESCRIPTION = 'SQL migrations for Postgres'
 URL = 'https://github.com/leantaas/postgoose'
 EMAIL = 'd.babiak@gmail.com'
 AUTHOR = 'dmb'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '0.0.1'
+VERSION = '0.0.3'
 
 REQUIRED = ['psycopg2>=2.7.5'] # todo: 'psycopg2==2.7.5 --no-binary psycopg2'
 
@@ -88,9 +88,11 @@ setup(
     install_requires=REQUIRED,
     extras_require=EXTRAS,
     include_package_data=True,
-    license='MIT',
+    license='Apache License 2.0',
     classifiers=[
         'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: Implementation :: CPython'
     ],
