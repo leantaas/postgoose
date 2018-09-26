@@ -2,20 +2,29 @@
 
 SQL migrations for Postgres
 
-Usage:
 ```
-docker build -t iqueue/goose .
-
-docker run \
-  -it --rm \
-  --name=goose-migrate \ 
-  -e 'PGPASSWORD=top-secret' \
-  -e 'DB_HOST=docker.for.mac.localhost' \
-  -v "${PWD}/migrations:/opt/leantaas/migrations" \
-  iqueue/goose
+PGPASSWORD=top-secret goose ./tests/master_migrations  
 ```
 
-Where `${PWD}/migrations` is some directory of form:
+(Assuming you have a Postgres server running on `localhost:5432` with a high-entropy admin password)
+
+```
+
+usage: goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME]
+             migrations_directory
+
+positional arguments:
+  migrations_directory  Path to directory containing migrations
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --host HOST
+  -p PORT, --port PORT
+  -U USERNAME, --username USERNAME
+  -d DBNAME, --dbname DBNAME
+```
+
+Where `migrations_directory` is some directory of form:
 ```
 ./migrations
   1_up.sql
