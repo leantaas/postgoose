@@ -1,1 +1,4 @@
 migrations
+dist/
+build/
+*.egg-info/
