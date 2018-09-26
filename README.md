@@ -1,17 +1,21 @@
 ![](http://wildgoosefestival.org/wp-content/uploads/2014/06/wild-goose-in-action.jpg)
 
-SQL migrations for Postgres
-
+## SQL migrations for Postgres
 ```
 PGPASSWORD=top-secret goose ./tests/master_migrations  
 ```
-
 (Assuming you have a Postgres server running on `localhost:5432` with a high-entropy admin password)
 
+## Installation
+```
+pip install postgoose
 ```
 
-usage: goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME]
-             migrations_directory
+## Usage
+
+```
+goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME]
+      migrations_directory
 
 positional arguments:
   migrations_directory  Path to directory containing migrations
@@ -46,6 +50,7 @@ E.g. you are on master branch on revision 5 and want to switch to a feature bran
 Applying migrations through Goose will leave you on either revision 5 (if an error is encountered) or revision 4' (if migration is successful) but not on any of 4, 3, 2, or 3'. 
 
 --------------------------------------------------------------------
+# License
 
 Copyright 2018 LeanTaas, Inc. 
 
