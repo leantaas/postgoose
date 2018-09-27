@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+while true; do
+  date
+  [ -f mutex ] && break
+  sleep 1
+done;
+
+echo
+echo 'Trying to apply migrations'
+
+goose --schema=a_schema tests/master_migrations
