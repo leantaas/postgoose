@@ -7,11 +7,13 @@ import os
 from pathlib import PosixPath
 from typing import List, Set, Iterable, Optional, T, Tuple
 
-from psycopg2 import connect
+from psycopg2 import connect, OperationalError, IntegrityError, sql
 
 
 DBParams = namedtuple('DBParams', 'user password host port database')
 Migration = namedtuple('Migration', 'migration_id up down')
+Schema = str
+
 
 
 def get_migration_id(file_name: str) -> int:
@@ -75,23 +77,49 @@ def parse_migration(dir: PosixPath, migration_id: int) -> Migration:
         return migration
 
 
+def acquire_mutex(cursor) -> None:
+    try:
+        cursor.execute('''
+        /* Ideal lock timeout? */
+        SET lock_timeout TO '2s';    
+
+        LOCK TABLE goose_migrations IN EXCLUSIVE MODE;
+    ''')
+    except OperationalError as e:
+        print('Migrations already in progress')
+        exit(2)
+
+def set_search_path(cursor, schema: str) -> None:
+    cursor.execute(
+        sql.SQL(
+            'set search_path to {}'.format(schema)
+        )
+    )
+
 def main() -> None:
-    migrations_directory, db_params = _parse_args()
-    conn = connect(**db_params._asdict())
-    
+    migrations_directory, db_params, schema = _parse_args()
+
     assert_all_migrations_present(migrations_directory)
 
-    # TODO - use mutex on table
-    migrations_from_db: List[Migration] = sorted(get_db_migrations(conn), key=lambda m: m.migration_id)
-    migrations_from_filesystem: List[Migration] = sorted(parse_migrations(migrations_directory), key=lambda m: m.migration_id)
-
-    old_branch, new_branch = get_diff(migrations_from_db, migrations_from_filesystem)
+    conn = connect(**db_params._asdict())
 
     with conn:
-        with conn.cursor() as cursor:
-            if old_branch:
-                unapply_all(cursor, old_branch)
-            apply_all(cursor, new_branch)
+        cursor = conn.cursor()
+
+        set_search_path(cursor, schema)
+
+        CINE_migrations_table(conn.cursor())
+
+        migrations_from_db: List[Migration] = sorted(get_db_migrations(conn), key=lambda m: m.migration_id)
+        migrations_from_filesystem: List[Migration] = sorted(parse_migrations(migrations_directory), key=lambda m: m.migration_id)
+
+        old_branch, new_branch = get_diff(migrations_from_db, migrations_from_filesystem)
+
+        acquire_mutex(cursor)
+
+        if old_branch:
+            unapply_all(cursor, old_branch)
+        apply_all(cursor, new_branch)
 
 
 def apply_all(cursor, migrations) -> None:
@@ -122,13 +150,14 @@ def apply_down(cursor, migration: Migration) -> None:
     cursor.execute('DELETE FROM goose_migrations WHERE migration_id = %s;', (migration.migration_id,))
 
 
-def _parse_args() -> (PosixPath, DBParams):
+def _parse_args() -> (PosixPath, DBParams, Schema):
     parser = ArgumentParser()
     parser.add_argument('migrations_directory', help='Path to directory containing migrations')
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('-p', '--port', default=5432, type=int)
     parser.add_argument('-U', '--username', default='postgres')
     parser.add_argument('-d', '--dbname', default='postgres')
+    parser.add_argument('-s', '--schema', default='public')
     args = parser.parse_args()
     print(args)
 
@@ -145,7 +174,7 @@ def _parse_args() -> (PosixPath, DBParams):
         port=args.port,
         database=args.dbname
     )
-    return migrations_directory, db_params
+    return migrations_directory, db_params, args.schema
 
 
 def _get_migrations_directory(pathname: str) -> PosixPath:
@@ -213,20 +242,24 @@ def get_diff(db_migrations: List[Migration], file_system_migrations: List[Migrat
         return old_branch, new_branch
 
 
-def create_migrations_table(cursor) -> None:
-    cursor.execute('''
-create table goose_migrations (
-    migration_id int      not null primary key,
-    up_digest    char(64) not null,
-    up           text     not null,
-    down_digest  char(64) not null,
-    down         text     not null,
+def CINE_migrations_table(cursor) -> None:
+    try:
+        cursor.execute('''
+    create table if not exists goose_migrations (
+        migration_id int      not null primary key,
+        up_digest    char(64) not null,
+        up           text     not null,
+        down_digest  char(64) not null,
+        down         text     not null,
 
-    /* meta */
-    created_datetime  timestamp not null default now(),
-    modified_datetime timestamp not null default now()
-);
-    ''')
+        /* meta */
+        created_datetime  timestamp not null default now(),
+        modified_datetime timestamp not null default now()
+    );
+        ''')
+    except IntegrityError as e:
+        print('Migrations already in process')
+        exit(4)
 
 
 if __name__ == '__main__':
