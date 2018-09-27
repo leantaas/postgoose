@@ -1,21 +1,34 @@
 ![](http://wildgoosefestival.org/wp-content/uploads/2014/06/wild-goose-in-action.jpg)
 
-SQL migrations for Postgres
-
-Usage:
+## SQL migrations for Postgres
 ```
-docker build -t iqueue/goose .
+PGPASSWORD=top-secret goose ./tests/master_migrations  
+```
+(Assuming you have a Postgres server running on `localhost:5432` with a high-entropy admin password)
 
-docker run \
-  -it --rm \
-  --name=goose-migrate \ 
-  -e 'PGPASSWORD=top-secret' \
-  -e 'DB_HOST=docker.for.mac.localhost' \
-  -v "${PWD}/migrations:/opt/leantaas/migrations" \
-  iqueue/goose
+## Installation
+```
+pip install postgoose
 ```
 
-Where `${PWD}/migrations` is some directory of form:
+## Usage
+
+```
+goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME]
+      migrations_directory
+
+positional arguments:
+  migrations_directory  Path to directory containing migrations
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --host HOST
+  -p PORT, --port PORT
+  -U USERNAME, --username USERNAME
+  -d DBNAME, --dbname DBNAME
+```
+
+Where `migrations_directory` is some directory of form:
 ```
 ./migrations
   1_up.sql
@@ -37,6 +50,7 @@ E.g. you are on master branch on revision 5 and want to switch to a feature bran
 Applying migrations through Goose will leave you on either revision 5 (if an error is encountered) or revision 4' (if migration is successful) but not on any of 4, 3, 2, or 3'. 
 
 --------------------------------------------------------------------
+# License
 
 Copyright 2018 LeanTaas, Inc. 
 
