@@ -222,6 +222,7 @@ def get_diff(db_migrations: List[Migration], file_system_migrations: List[Migrat
     )
 
     if first_divergence:
+        # We have a fork
         old_branch = sorted(
             [m for m in db_migrations if m.migration_id >= first_divergence.migration_id],
             key=lambda m: m.migration_id,
@@ -232,14 +233,23 @@ def get_diff(db_migrations: List[Migration], file_system_migrations: List[Migrat
             key=lambda m: m.migration_id
         )
         return old_branch, new_branch
+    elif len(db_migrations) > len(file_system_migrations):
+        # database is strict superset of filesystem
+        max_new_id = max(m.migration_id for m in file_system_migrations)
+        old_branch = sorted(
+            [m for m in db_migrations if m.migration_id > max_new_id],
+            key=lambda m: m.migration_id,
+            reverse=True
+        )
+        return old_branch, []
     else:
-        old_branch = []
+        # file_system is weak superset of database
         max_old_id = 0 if not db_migrations else max(m.migration_id for m in db_migrations)
         new_branch = sorted(
             [m for m in file_system_migrations if m.migration_id > max_old_id],
             key=lambda m: m.migration_id
         )
-        return old_branch, new_branch
+        return [], new_branch
 
 
 def CINE_migrations_table(cursor) -> None:
