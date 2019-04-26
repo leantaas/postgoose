@@ -5,7 +5,7 @@ from collections import namedtuple
 from hashlib import sha256
 import os 
 from pathlib import PosixPath
-from typing import List, Set, Iterable, Optional, T, Tuple
+from typing import List, Set, Iterable, Optional, TypeVar, Tuple
 
 from psycopg2 import connect, OperationalError, IntegrityError, sql
 
@@ -15,6 +15,7 @@ Migration = namedtuple('Migration', 'migration_id up down')
 Schema = str
 
 
+T = TypeVar('T')
 
 def get_migration_id(file_name: str) -> int:
     try:
@@ -96,8 +97,18 @@ def set_search_path(cursor, schema: str) -> None:
         )
     )
 
+def log_downs_error(old_branch) -> None:
+    n = 60
+    print('=' * n)
+    print('[ERROR] Downs detected:', end='\n\n')
+    for m in old_branch:
+        print(f'/* migration_id: {m.migration_id} */')
+        print(m.down, end='\n\n')
+    print('=' * n)
+    print('\nRe-run with --force-downs if you would like downs executed\n')
+
 def main() -> None:
-    migrations_directory, db_params, schema = _parse_args()
+    migrations_directory, db_params, schema, force_downs = _parse_args()
 
     assert_all_migrations_present(migrations_directory)
 
@@ -118,7 +129,12 @@ def main() -> None:
         acquire_mutex(cursor)
 
         if old_branch:
-            unapply_all(cursor, old_branch)
+            if force_downs:
+                unapply_all(cursor, old_branch)
+            else:
+                log_downs_error(old_branch)
+                exit(42)
+
         apply_all(cursor, new_branch)
 
 
@@ -150,7 +166,7 @@ def apply_down(cursor, migration: Migration) -> None:
     cursor.execute('DELETE FROM goose_migrations WHERE migration_id = %s;', (migration.migration_id,))
 
 
-def _parse_args() -> (PosixPath, DBParams, Schema):
+def _parse_args() -> (PosixPath, DBParams, Schema, bool):
     parser = ArgumentParser()
     parser.add_argument('migrations_directory', help='Path to directory containing migrations')
     parser.add_argument('--host', default='127.0.0.1')
@@ -158,6 +174,10 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
     parser.add_argument('-U', '--username', default='postgres')
     parser.add_argument('-d', '--dbname', default='postgres')
     parser.add_argument('-s', '--schema', default='public')
+    parser.add_argument(
+        '--force-downs', action='store_true',
+        help='If present, postgoose will auto apply any downs'
+    )
     args = parser.parse_args()
     print(args)
 
@@ -172,9 +192,9 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
         password=os.environ['PGPASSWORD'],
         host=args.host,
         port=args.port,
-        database=args.dbname
+        database=args.dbname,
     )
-    return migrations_directory, db_params, args.schema
+    return migrations_directory, db_params, args.schema, args.force_downs
 
 
 def _get_migrations_directory(pathname: str) -> PosixPath:
