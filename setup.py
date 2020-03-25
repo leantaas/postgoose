@@ -18,7 +18,7 @@ AUTHOR = 'dmb'
 REQUIRES_PYTHON = '>=3.6.0'
 VERSION = '0.0.5'
 
-REQUIRED = ['psycopg2>=2.8.4'] 
+REQUIRED = ['psycopg2-binary>=2.8.4'] 
 
 EXTRAS = {}
 
