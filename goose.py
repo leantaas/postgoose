@@ -96,8 +96,15 @@ def set_search_path(cursor, schema: str) -> None:
         )
     )
 
+def set_role(cursor, role: str) -> None:
+    cursor.execute(
+        sql.SQL(
+            'set role {}'.format(role)
+        )
+    )
+
 def main() -> None:
-    migrations_directory, db_params, schema = _parse_args()
+    migrations_directory, db_params, schema, role = _parse_args()
 
     assert_all_migrations_present(migrations_directory)
 
@@ -107,6 +114,9 @@ def main() -> None:
         cursor = conn.cursor()
 
         set_search_path(cursor, schema)
+
+        if role is not None:
+            set_role(cursor, role)
 
         CINE_migrations_table(conn.cursor())
 
@@ -158,6 +168,7 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
     parser.add_argument('-U', '--username', default='postgres')
     parser.add_argument('-d', '--dbname', default='postgres')
     parser.add_argument('-s', '--schema', default='public')
+    parser.add_argument('-r', '--role', default=None)
     args = parser.parse_args()
     print(args)
 
@@ -174,7 +185,7 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
         port=args.port,
         database=args.dbname
     )
-    return migrations_directory, db_params, args.schema
+    return migrations_directory, db_params, args.schema, args.role
 
 
 def _get_migrations_directory(pathname: str) -> PosixPath:
