@@ -14,7 +14,7 @@ pip install postgoose
 ## Usage
 
 ```
-goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME]
+goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME] [-s SCHEMA] [-r ROLE]
       migrations_directory
 
 positional arguments:
@@ -26,6 +26,8 @@ optional arguments:
   -p PORT, --port PORT
   -U USERNAME, --username USERNAME
   -d DBNAME, --dbname DBNAME
+  -s SCHEMA, --schema SCHEMA
+  -r ROLE, --role ROLE
 ```
 
 Where `migrations_directory` is some directory of form:
