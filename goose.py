@@ -8,7 +8,7 @@ from pathlib import PosixPath
 from typing import List, Set, Iterable, Optional, T, Tuple
 
 from psycopg2 import connect, OperationalError, IntegrityError, sql
-
+from version import __version__
 
 DBParams = namedtuple('DBParams', 'user password host port database')
 Migration = namedtuple('Migration', 'migration_id up down')
@@ -169,6 +169,10 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
     parser.add_argument('-d', '--dbname', default='postgres')
     parser.add_argument('-s', '--schema', default='public')
     parser.add_argument('-r', '--role', default=None)
+
+    parser.add_argument('-v', '--version', action='version',
+                    version='%(prog)s {version}'.format(version=__version__))
+
     args = parser.parse_args()
     print(args)
 
