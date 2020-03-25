@@ -16,7 +16,7 @@ URL = 'https://github.com/leantaas/postgoose'
 EMAIL = 'd.babiak@gmail.com'
 AUTHOR = 'dmb'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '0.0.5'
+VERSION = '0.0.6-beta1'
 
 REQUIRED = ['psycopg2-binary>=2.8.4'] 
 
