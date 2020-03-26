@@ -5,3 +5,4 @@ build/
 
 # Comment out unwanted pycache folder
 __pycache__
+.venv
