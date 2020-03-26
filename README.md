@@ -65,8 +65,8 @@ Applying migrations through Goose will leave you on either revision 5 (if an err
 * Create a virtual environemnt
   ```bash
   cd test-postgoose
-  python3 -m venv venv
-  source ./venv/bin/activate
+  python3 -m venv .venv
+  source .venv/bin/activate
   ```
 * Install postgoose from the checkedout repository folder
   ```bash
@@ -80,44 +80,27 @@ Applying migrations through Goose will leave you on either revision 5 (if an err
   ```bash
   docker run --name test-postgres -e POSTGRES_PASSWORD=top-secret -p 54320:5432 -d postgres:10
   ```
-* Connect to running postgres container
+* Create base database, users and roles
   ```bash
-  docker exec -it test-postgres bash
+  # Hope you have psql available on your local machine
+  PGPASSWORD=top-secret psql -v ON_ERRO_STOP=1 -U postgres -h 127.0.0.1 -p 54320 postgres -a -f ../postgoose/tests/setup/create-database-users-roles.sql
   ```
-* Login as root user to create database, user, role and schema
+* Create schema
   ```bash
-  PGPASSWORD=password psql -U postgres -h 127.0.0.1 -p 5432 postgres
-  ```
-* Run following SQL statements
-  ```sql
-  -- Create Database
-  CREATE DATABASE test_db;
-
-  -- Create User and Role
-  CREATE USER user_admin WITH PASSWORD 'top-secret-user';
-  CREATE ROLE role_admin;
-  GRANT role_admin TO user_admin;
-
-  -- Create Schema
-  CREATE SCHEMA schema_1;
-
-  -- Cleanup
-  REVOKE all ON DATABASE test_db FROM public;
-  GRANT CONNECT CREATE ON DATABASE test_db TO role_admin;
-  ALTER ROLE role_admin NOSUPERUSER NOCREATEDB NOCREATEROLE;
-  ```
-* Quit from psql and exit from container
-  ```psql
-  \q
-  ```
-  ```bash
-  exit
+  PGPASSWORD=top-secret-admin-user psql -v ON_ERRO_STOP=1 -U user_admin -h 127.0.0.1 -p 54320 test_db -a -f ../postgoose/tests/setup/create-schema.sql
   ```
 * Run migrations
   ```bash
-  PGPASSWORD=top-secret-user goose --host 127.0.0.1 -p 54320 -U user_admin -d test_db -s schema_1 -r role_admin ./tests/branch-migrations
+  PGPASSWORD=top-secret-admin-user goose --host 127.0.0.1 -p 54320 -U user_admin -d test_db -s schema_1 -r role_admin ../postgoose/tests/branch_migrations
   ```
 * Validate migrations
+  ```bash
+  # List Tables in Schema
+  PGPASSWORD=top-secret-admin-user psql -v ON_ERRO_STOP=1 -U user_admin -h 127.0.0.1 -p 54320 test_db -c "SELECT schemaname, tablename, tableowner FROM pg_tables where schemaname='schema_1'"
+
+  # List rows from goose_migrations table
+  PGPASSWORD=top-secret-admin-user psql -v ON_ERRO_STOP=1 -U user_admin -h 127.0.0.1 -p 54320 test_db -c "SELECT migration_id, up_digest, down_digest, created_datetime, modified_datetime FROM schema_1.goose_migrations"
+  ```
 * Clean up postgres docker container
   ```
   docker stop test-postgres && docker rm test-postgres
