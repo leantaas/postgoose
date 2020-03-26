@@ -59,7 +59,8 @@ def assert_all_migrations_present(dir: PosixPath) -> None:
 
 
 def parse_migrations(dir: PosixPath) -> List[Migration]:
-    max_migration_id: int = get_max_migration_id(dir)
+    filenames:List[str] = get_migration_files_filtered(dir)
+    max_migration_id: int = get_max_migration_id(filenames)
 
     migrations: List[Migration] = [
         parse_migration(dir, migration_id)
