@@ -24,17 +24,22 @@ def get_migration_id(file_name: str) -> int:
         exit(3)
 
 
-def get_max_migration_id(dir: PosixPath) -> int:
-    filenames: List[str] = os.listdir(dir.as_posix())
+def get_max_migration_id(filenames: List[str]) -> int:
     return max(
         get_migration_id(file_name)
         for file_name in filenames
     )
 
+def get_migration_files_filtered(dir: PosixPath) -> List[str]:
+    return [file for file in os.listdir(dir.as_posix()) if file.lower().endswith('.sql')]
 
 def assert_all_migrations_present(dir: PosixPath) -> None:
-    max_migration_id = get_max_migration_id(dir)
-    filenames: List[str] = os.listdir(dir.as_posix())
+    filenames:List[str] = get_migration_files_filtered(dir)
+    if not filenames:
+        print(f'Migrations folder {dir} is empty. Exiting gracefully!')
+        exit(0)
+
+    max_migration_id = get_max_migration_id(filenames)
 
     for migration_id in range(1, max_migration_id + 1):
         # todo - assertions can be ignored...?
