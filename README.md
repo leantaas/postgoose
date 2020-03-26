@@ -84,10 +84,14 @@ Applying migrations through Goose will leave you on either revision 5 (if an err
   ```bash
   # Hope you have psql available on your local machine
   PGPASSWORD=top-secret psql -v ON_ERRO_STOP=1 -U postgres -h 127.0.0.1 -p 54320 postgres -a -f ../postgoose/tests/setup/create-database-users-roles.sql
+
+  # Checkout `create-database-users-roles.sql` file for more details
   ```
 * Create schema
   ```bash
   PGPASSWORD=top-secret-admin-user psql -v ON_ERRO_STOP=1 -U user_admin -h 127.0.0.1 -p 54320 test_db -a -f ../postgoose/tests/setup/create-schema.sql
+
+  # Checkout `create-schema.sql` file for more details
   ```
 * Run migrations
   ```bash
