@@ -9,6 +9,7 @@ from shutil import rmtree
 
 from setuptools import find_packages, setup, Command
 
+from version import __version__
 
 NAME = 'postgoose'
 DESCRIPTION = 'SQL migrations for Postgres'
@@ -16,9 +17,9 @@ URL = 'https://github.com/leantaas/postgoose'
 EMAIL = 'd.babiak@gmail.com'
 AUTHOR = 'dmb'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '0.0.5'
+VERSION = __version__
 
-REQUIRED = ['psycopg2>=2.8.4'] 
+REQUIRED = ['psycopg2-binary>=2.8.4'] 
 
 EXTRAS = {}
 
@@ -81,7 +82,7 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    py_modules=['goose'],
+    py_modules=['goose','version'],
     entry_points={
         'console_scripts': ['goose=goose:main'],
     },

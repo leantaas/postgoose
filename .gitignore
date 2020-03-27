@@ -2,3 +2,7 @@ migrations
 dist/
 build/
 *.egg-info/
+
+# Comment out unwanted pycache folder
+__pycache__
+.venv

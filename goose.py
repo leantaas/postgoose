@@ -8,7 +8,7 @@ from pathlib import PosixPath
 from typing import List, Set, Iterable, Optional, T, Tuple
 
 from psycopg2 import connect, OperationalError, IntegrityError, sql
-
+from version import __version__
 
 DBParams = namedtuple('DBParams', 'user password host port database')
 Migration = namedtuple('Migration', 'migration_id up down')
@@ -24,17 +24,22 @@ def get_migration_id(file_name: str) -> int:
         exit(3)
 
 
-def get_max_migration_id(dir: PosixPath) -> int:
-    filenames: List[str] = os.listdir(dir.as_posix())
+def get_max_migration_id(filenames: List[str]) -> int:
     return max(
         get_migration_id(file_name)
         for file_name in filenames
     )
 
+def get_migration_files_filtered(dir: PosixPath) -> List[str]:
+    return [file for file in os.listdir(dir.as_posix()) if file.lower().endswith('.sql')]
 
 def assert_all_migrations_present(dir: PosixPath) -> None:
-    max_migration_id = get_max_migration_id(dir)
-    filenames: List[str] = os.listdir(dir.as_posix())
+    filenames:List[str] = get_migration_files_filtered(dir)
+    if not filenames:
+        print(f'Migrations folder {dir} is empty. Exiting gracefully!')
+        exit(0)
+
+    max_migration_id = get_max_migration_id(filenames)
 
     for migration_id in range(1, max_migration_id + 1):
         # todo - assertions can be ignored...?
@@ -54,7 +59,8 @@ def assert_all_migrations_present(dir: PosixPath) -> None:
 
 
 def parse_migrations(dir: PosixPath) -> List[Migration]:
-    max_migration_id: int = get_max_migration_id(dir)
+    filenames:List[str] = get_migration_files_filtered(dir)
+    max_migration_id: int = get_max_migration_id(filenames)
 
     migrations: List[Migration] = [
         parse_migration(dir, migration_id)
@@ -96,8 +102,15 @@ def set_search_path(cursor, schema: str) -> None:
         )
     )
 
+def set_role(cursor, role: str) -> None:
+    cursor.execute(
+        sql.SQL(
+            'set role {}'.format(role)
+        )
+    )
+
 def main() -> None:
-    migrations_directory, db_params, schema = _parse_args()
+    migrations_directory, db_params, schema, role = _parse_args()
 
     assert_all_migrations_present(migrations_directory)
 
@@ -107,6 +120,9 @@ def main() -> None:
         cursor = conn.cursor()
 
         set_search_path(cursor, schema)
+
+        if role is not None:
+            set_role(cursor, role)
 
         CINE_migrations_table(conn.cursor())
 
@@ -158,6 +174,11 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
     parser.add_argument('-U', '--username', default='postgres')
     parser.add_argument('-d', '--dbname', default='postgres')
     parser.add_argument('-s', '--schema', default='public')
+    parser.add_argument('-r', '--role', default=None)
+
+    parser.add_argument('-v', '--version', action='version',
+                    version='%(prog)s {version}'.format(version=__version__))
+
     args = parser.parse_args()
     print(args)
 
@@ -174,7 +195,7 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
         port=args.port,
         database=args.dbname
     )
-    return migrations_directory, db_params, args.schema
+    return migrations_directory, db_params, args.schema, args.role
 
 
 def _get_migrations_directory(pathname: str) -> PosixPath:
