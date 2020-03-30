@@ -110,7 +110,7 @@ def set_role(cursor, role: str) -> None:
     )
 
 def main() -> None:
-    migrations_directory, db_params, schema, role = _parse_args()
+    migrations_directory, db_params, schema, role, migrationPipe = _parse_args()
 
     assert_all_migrations_present(migrations_directory)
 
@@ -175,6 +175,7 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
     parser.add_argument('-d', '--dbname', default='postgres')
     parser.add_argument('-s', '--schema', default='public')
     parser.add_argument('-r', '--role', default=None)
+    parser.add_argument('-m', '--migrationPipe', default=False)
 
     parser.add_argument('-v', '--version', action='version',
                     version='%(prog)s {version}'.format(version=__version__))
@@ -195,7 +196,7 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
         port=args.port,
         database=args.dbname
     )
-    return migrations_directory, db_params, args.schema, args.role
+    return migrations_directory, db_params, args.schema, args.role, args.migrationPipe
 
 
 def _get_migrations_directory(pathname: str) -> PosixPath:
