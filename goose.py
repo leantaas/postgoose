@@ -89,8 +89,8 @@ def acquire_mutex(cursor, migration_table) -> None:
         /* Ideal lock timeout? */
         SET lock_timeout TO '2s';    
 
-        LOCK TABLE %s IN EXCLUSIVE MODE;
-    ''', (migration_table,))
+        LOCK TABLE {} IN EXCLUSIVE MODE;
+    '''.format(migration_table))
     except OperationalError as e:
         print('Migrations already in progress')
         exit(2)
@@ -131,39 +131,39 @@ def main() -> None:
 
         old_branch, new_branch = get_diff(migrations_from_db, migrations_from_filesystem)
 
-        acquire_mutex(cursor)
+        acquire_mutex(cursor, migration_table)
 
         if old_branch:
-            unapply_all(cursor, old_branch)
-        apply_all(cursor, new_branch)
+            unapply_all(cursor, old_branch, migration_table)
+        apply_all(cursor, new_branch, migration_table)
 
 
-def apply_all(cursor, migrations) -> None:
+def apply_all(cursor, migrations, migration_table) -> None:
     assert sorted(migrations, key=lambda m: m.migration_id) == migrations, 'Migrations must be applied in ascending order'
     for migration in migrations:
-        apply_up(cursor, migration)
+        apply_up(cursor, migration, migration_table)
 
 
-def unapply_all(cursor, migrations) -> None:
+def unapply_all(cursor, migrations, migration_table) -> None:
     assert sorted(migrations, key=lambda m: m.migration_id, reverse=True) == migrations, 'Migrations must be unapplied in descending order'
     for migration in migrations:
-        apply_down(cursor, migration)
+        apply_down(cursor, migration, migration_table)
 
 
 def apply_up(cursor, migration: Migration, migration_table) -> None:
     print(migration.migration_id, migration.up, end='\n' * 2)
     cursor.execute(migration.up)
     cursor.execute('''
-INSERT INTO %s (migration_id, up_digest, up, down_digest, down)
+INSERT INTO ''' + migration_table +''' (migration_id, up_digest, up, down_digest, down)
      VALUES (%s, %s, %s, %s, %s);
-    ''', (migration_table, migration.migration_id, digest(migration.up), migration.up, digest(migration.down), migration.down,)
+    ''', (migration.migration_id, digest(migration.up), migration.up, digest(migration.down), migration.down,)
     )
 
 
 def apply_down(cursor, migration: Migration, migration_table) -> None:
     print(migration.migration_id, migration.down, end='\n' * 2)
     cursor.execute(migration.down)
-    cursor.execute('DELETE FROM %s WHERE migration_id = %s;', (migration_table, migration.migration_id,))
+    cursor.execute('DELETE FROM ' + migration_table +' WHERE migration_id = %s;', (migration.migration_id,))
 
 
 def _parse_args() -> (PosixPath, DBParams, Schema):
@@ -224,7 +224,7 @@ def get_db_migrations(conn, migration_table) -> List[Migration]:
     with conn:
         # todo - namedtuple cursor
         with conn.cursor() as cursor:
-            cursor.execute('select migration_id, up_digest, up, down_digest, down from %s', (migration_table,))
+            cursor.execute('select migration_id, up_digest, up, down_digest, down from {}'.format(migration_table))
             rs = cursor.fetchall()
             return [
                 Migration(
@@ -269,7 +269,7 @@ def get_diff(db_migrations: List[Migration], file_system_migrations: List[Migrat
 def CINE_migrations_table(cursor, migration_table) -> None:
     try:
         cursor.execute('''
-            create table if not exists %s (
+            create table if not exists {} (
                 migration_id int      not null primary key,
                 up_digest    char(64) not null,
                 up           text     not null,
@@ -280,7 +280,7 @@ def CINE_migrations_table(cursor, migration_table) -> None:
                 created_datetime  timestamp not null default now(),
                 modified_datetime timestamp not null default now()
             );
-                ''', (migration_table,))
+                '''.format(migration_table))
 
     except IntegrityError as e:
         print('Migrations already in process')
