@@ -28,7 +28,7 @@ optional arguments:
   -d DBNAME, --dbname DBNAME
   -s SCHEMA, --schema SCHEMA
   -r ROLE, --role ROLE
-  -m MIGRATIONTABLE, --migrationTable MIGRATIONTABLE
+  -m MIGRATIONTABLE, --migrationTable MIGRATIONTABLE         Default name is "goose_migrations" if migration table name is not specified.  
   -v, --version         show program's version number and exit
 ```
 
