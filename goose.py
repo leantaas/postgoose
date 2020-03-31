@@ -83,14 +83,14 @@ def parse_migration(dir: PosixPath, migration_id: int) -> Migration:
         return migration
 
 
-def acquire_mutex(cursor) -> None:
+def acquire_mutex(cursor, migration_table) -> None:
     try:
         cursor.execute('''
         /* Ideal lock timeout? */
         SET lock_timeout TO '2s';    
 
-        LOCK TABLE goose_migrations IN EXCLUSIVE MODE;
-    ''')
+        LOCK TABLE %s IN EXCLUSIVE MODE;
+    ''', (migration_table,))
     except OperationalError as e:
         print('Migrations already in progress')
         exit(2)
@@ -150,20 +150,20 @@ def unapply_all(cursor, migrations) -> None:
         apply_down(cursor, migration)
 
 
-def apply_up(cursor, migration: Migration) -> None:
+def apply_up(cursor, migration: Migration, migration_table) -> None:
     print(migration.migration_id, migration.up, end='\n' * 2)
     cursor.execute(migration.up)
     cursor.execute('''
-INSERT INTO goose_migrations (migration_id, up_digest, up, down_digest, down)
+INSERT INTO %s (migration_id, up_digest, up, down_digest, down)
      VALUES (%s, %s, %s, %s, %s);
-    ''', (migration.migration_id, digest(migration.up), migration.up, digest(migration.down), migration.down,)
+    ''', (migration_table, migration.migration_id, digest(migration.up), migration.up, digest(migration.down), migration.down,)
     )
 
 
-def apply_down(cursor, migration: Migration) -> None:
+def apply_down(cursor, migration: Migration, migration_table) -> None:
     print(migration.migration_id, migration.down, end='\n' * 2)
     cursor.execute(migration.down)
-    cursor.execute('DELETE FROM goose_migrations WHERE migration_id = %s;', (migration.migration_id,))
+    cursor.execute('DELETE FROM %s WHERE migration_id = %s;', (migration_table, migration.migration_id,))
 
 
 def _parse_args() -> (PosixPath, DBParams, Schema):
@@ -224,7 +224,7 @@ def get_db_migrations(conn, migration_table) -> List[Migration]:
     with conn:
         # todo - namedtuple cursor
         with conn.cursor() as cursor:
-            cursor.execute('select migration_id, up_digest, up, down_digest, down from '+migration_table)
+            cursor.execute('select migration_id, up_digest, up, down_digest, down from %s', (migration_table,))
             rs = cursor.fetchall()
             return [
                 Migration(
@@ -269,7 +269,7 @@ def get_diff(db_migrations: List[Migration], file_system_migrations: List[Migrat
 def CINE_migrations_table(cursor, migration_table) -> None:
     try:
         cursor.execute('''
-            create table if not exists '''+ migration_table + ''' (
+            create table if not exists %s (
                 migration_id int      not null primary key,
                 up_digest    char(64) not null,
                 up           text     not null,
@@ -280,7 +280,7 @@ def CINE_migrations_table(cursor, migration_table) -> None:
                 created_datetime  timestamp not null default now(),
                 modified_datetime timestamp not null default now()
             );
-                ''')
+                ''', (migration_table,))
 
     except IntegrityError as e:
         print('Migrations already in process')
