@@ -110,7 +110,7 @@ def set_role(cursor, role: str) -> None:
     )
 
 def main() -> None:
-    migrations_directory, db_params, schema, role, migrationPipe = _parse_args()
+    migrations_directory, db_params, schema, role, migration_pipe = _parse_args()
 
     assert_all_migrations_present(migrations_directory)
 
@@ -124,7 +124,7 @@ def main() -> None:
         if role is not None:
             set_role(cursor, role)
 
-        CINE_migrations_table(conn.cursor())
+        CINE_migrations_table(conn.cursor(), migration_pipe)
 
         migrations_from_db: List[Migration] = sorted(get_db_migrations(conn), key=lambda m: m.migration_id)
         migrations_from_filesystem: List[Migration] = sorted(parse_migrations(migrations_directory), key=lambda m: m.migration_id)
@@ -264,21 +264,38 @@ def get_diff(db_migrations: List[Migration], file_system_migrations: List[Migrat
         return old_branch, new_branch
 
 
-def CINE_migrations_table(cursor) -> None:
+def CINE_migrations_table(cursor,migration_pipe) -> None:
     try:
-        cursor.execute('''
-    create table if not exists goose_migrations (
-        migration_id int      not null primary key,
-        up_digest    char(64) not null,
-        up           text     not null,
-        down_digest  char(64) not null,
-        down         text     not null,
 
-        /* meta */
-        created_datetime  timestamp not null default now(),
-        modified_datetime timestamp not null default now()
-    );
-        ''')
+        if migration_pipe:
+            cursor.execute('''
+                            create table if not exists goose_migrations_pipeline (
+                                migration_id int      not null primary key,
+                                up_digest    char(64) not null,
+                                up           text     not null,
+                                down_digest  char(64) not null,
+                                down         text     not null,
+
+                                /* meta */
+                                created_datetime  timestamp not null default now(),
+                                modified_datetime timestamp not null default now()
+                            );
+                                ''')
+        else:
+            cursor.execute('''
+                create table if not exists goose_migrations (
+                    migration_id int      not null primary key,
+                    up_digest    char(64) not null,
+                    up           text     not null,
+                    down_digest  char(64) not null,
+                    down         text     not null,
+
+                    /* meta */
+                    created_datetime  timestamp not null default now(),
+                    modified_datetime timestamp not null default now()
+                );
+                    ''')
+
     except IntegrityError as e:
         print('Migrations already in process')
         exit(4)
