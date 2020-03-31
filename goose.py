@@ -126,7 +126,7 @@ def main() -> None:
 
         CINE_migrations_table(conn.cursor(), migration_pipe)
 
-        migrations_from_db: List[Migration] = sorted(get_db_migrations(conn), key=lambda m: m.migration_id)
+        migrations_from_db: List[Migration] = sorted(get_db_migrations(conn, migration_pipe), key=lambda m: m.migration_id)
         migrations_from_filesystem: List[Migration] = sorted(parse_migrations(migrations_directory), key=lambda m: m.migration_id)
 
         old_branch, new_branch = get_diff(migrations_from_db, migrations_from_filesystem)
@@ -220,20 +220,35 @@ def first(xs: Iterable[T]) -> Optional[T]:
         return None
 
 
-def get_db_migrations(conn) -> List[Migration]:
+def get_db_migrations(conn, migration_pipe) -> List[Migration]:
     with conn:
         # todo - namedtuple cursor
         with conn.cursor() as cursor:
-            cursor.execute('select migration_id, up_digest, up, down_digest, down from goose_migrations')
-            rs = cursor.fetchall() 
-            return [
+
+            if migration_pipe:
+                cursor.execute('select migration_id, up_digest, up, down_digest, down from goose_migrations_pipeline')
+                rs = cursor.fetchall()
+                return [
                     Migration(
-                    migration_id = r[0],
-                    up = r[2],
-                    down = r[4]
-                )
-                for r in rs
-            ]
+                        migration_id=r[0],
+                        up=r[2],
+                        down=r[4]
+                    )
+                    for r in rs
+                ]
+            else:
+                cursor.execute('select migration_id, up_digest, up, down_digest, down from goose_migrations')
+                rs = cursor.fetchall()
+                return [
+                    Migration(
+                        migration_id=r[0],
+                        up=r[2],
+                        down=r[4]
+                    )
+                    for r in rs
+                ]
+
+
 
 
 def get_diff(db_migrations: List[Migration], file_system_migrations: List[Migration]) -> Tuple[List[Migration], List[Migration]]:
@@ -264,7 +279,7 @@ def get_diff(db_migrations: List[Migration], file_system_migrations: List[Migrat
         return old_branch, new_branch
 
 
-def CINE_migrations_table(cursor,migration_pipe) -> None:
+def CINE_migrations_table(cursor, migration_pipe) -> None:
     try:
 
         if migration_pipe:
