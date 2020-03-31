@@ -110,7 +110,7 @@ def set_role(cursor, role: str) -> None:
     )
 
 def main() -> None:
-    migrations_directory, db_params, schema, role, migration_pipe = _parse_args()
+    migrations_directory, db_params, schema, role, migration_table = _parse_args()
 
     assert_all_migrations_present(migrations_directory)
 
@@ -124,9 +124,9 @@ def main() -> None:
         if role is not None:
             set_role(cursor, role)
 
-        CINE_migrations_table(conn.cursor(), migration_pipe)
+        CINE_migrations_table(conn.cursor(), migration_table)
 
-        migrations_from_db: List[Migration] = sorted(get_db_migrations(conn, migration_pipe), key=lambda m: m.migration_id)
+        migrations_from_db: List[Migration] = sorted(get_db_migrations(conn, migration_table), key=lambda m: m.migration_id)
         migrations_from_filesystem: List[Migration] = sorted(parse_migrations(migrations_directory), key=lambda m: m.migration_id)
 
         old_branch, new_branch = get_diff(migrations_from_db, migrations_from_filesystem)
@@ -175,7 +175,7 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
     parser.add_argument('-d', '--dbname', default='postgres')
     parser.add_argument('-s', '--schema', default='public')
     parser.add_argument('-r', '--role', default=None)
-    parser.add_argument('-m', '--migrationPipe', default=False)
+    parser.add_argument('-m', '--migrationTable', default='goose_migrations')
 
     parser.add_argument('-v', '--version', action='version',
                     version='%(prog)s {version}'.format(version=__version__))
@@ -196,7 +196,7 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
         port=args.port,
         database=args.dbname
     )
-    return migrations_directory, db_params, args.schema, args.role, args.migrationPipe
+    return migrations_directory, db_params, args.schema, args.role, args.migrationTable
 
 
 def _get_migrations_directory(pathname: str) -> PosixPath:
@@ -220,33 +220,20 @@ def first(xs: Iterable[T]) -> Optional[T]:
         return None
 
 
-def get_db_migrations(conn, migration_pipe) -> List[Migration]:
+def get_db_migrations(conn, migration_table) -> List[Migration]:
     with conn:
         # todo - namedtuple cursor
         with conn.cursor() as cursor:
-
-            if migration_pipe:
-                cursor.execute('select migration_id, up_digest, up, down_digest, down from goose_migrations_pipeline')
-                rs = cursor.fetchall()
-                return [
-                    Migration(
-                        migration_id=r[0],
-                        up=r[2],
-                        down=r[4]
-                    )
-                    for r in rs
-                ]
-            else:
-                cursor.execute('select migration_id, up_digest, up, down_digest, down from goose_migrations')
-                rs = cursor.fetchall()
-                return [
-                    Migration(
-                        migration_id=r[0],
-                        up=r[2],
-                        down=r[4]
-                    )
-                    for r in rs
-                ]
+            cursor.execute('select migration_id, up_digest, up, down_digest, down from '+migration_table)
+            rs = cursor.fetchall()
+            return [
+                Migration(
+                    migration_id=r[0],
+                    up=r[2],
+                    down=r[4]
+                )
+                for r in rs
+            ]
 
 
 
@@ -279,37 +266,21 @@ def get_diff(db_migrations: List[Migration], file_system_migrations: List[Migrat
         return old_branch, new_branch
 
 
-def CINE_migrations_table(cursor, migration_pipe) -> None:
+def CINE_migrations_table(cursor, migration_table) -> None:
     try:
+        cursor.execute('''
+            create table if not exists '''+ migration_table + ''' (
+                migration_id int      not null primary key,
+                up_digest    char(64) not null,
+                up           text     not null,
+                down_digest  char(64) not null,
+                down         text     not null,
 
-        if migration_pipe:
-            cursor.execute('''
-                            create table if not exists goose_migrations_pipeline (
-                                migration_id int      not null primary key,
-                                up_digest    char(64) not null,
-                                up           text     not null,
-                                down_digest  char(64) not null,
-                                down         text     not null,
-
-                                /* meta */
-                                created_datetime  timestamp not null default now(),
-                                modified_datetime timestamp not null default now()
-                            );
-                                ''')
-        else:
-            cursor.execute('''
-                create table if not exists goose_migrations (
-                    migration_id int      not null primary key,
-                    up_digest    char(64) not null,
-                    up           text     not null,
-                    down_digest  char(64) not null,
-                    down         text     not null,
-
-                    /* meta */
-                    created_datetime  timestamp not null default now(),
-                    modified_datetime timestamp not null default now()
-                );
-                    ''')
+                /* meta */
+                created_datetime  timestamp not null default now(),
+                modified_datetime timestamp not null default now()
+            );
+                ''')
 
     except IntegrityError as e:
         print('Migrations already in process')
