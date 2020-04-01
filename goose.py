@@ -85,12 +85,12 @@ def parse_migration(dir: PosixPath, migration_id: int) -> Migration:
 
 def acquire_mutex(cursor, migration_table) -> None:
     try:
-        cursor.execute('''
+        cursor.execute(f'''
         /* Ideal lock timeout? */
         SET lock_timeout TO '2s';    
 
-        LOCK TABLE {} IN EXCLUSIVE MODE;
-    '''.format(migration_table))
+        LOCK TABLE {migration_table} IN EXCLUSIVE MODE;
+    ''')
     except OperationalError as e:
         print('Migrations already in progress')
         exit(2)
