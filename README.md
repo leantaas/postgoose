@@ -15,7 +15,7 @@ pip install postgoose
 ## Usage
 
 ```
-usage: goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME] [-s SCHEMA] [-r ROLE] [-v] migrations_directory
+usage: goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME] [-s SCHEMA] [-r ROLE] [-m MIGRATIONTABLE]  [-v] migrations_directory
 
 positional arguments:
   migrations_directory  Path to directory containing migrations
@@ -28,6 +28,7 @@ optional arguments:
   -d DBNAME, --dbname DBNAME
   -s SCHEMA, --schema SCHEMA
   -r ROLE, --role ROLE
+  -m MIGRATIONTABLE, --migrationTable MIGRATIONTABLE         Default name is "goose_migrations" if migration table name is not specified.  
   -v, --version         show program's version number and exit
 ```
 
