@@ -152,9 +152,11 @@ def unapply_all(cursor, migrations, migration_table) -> None:
 
 def apply_up(cursor, migration: Migration, migration_table) -> None:
     print(migration.migration_id, migration.up, end='\n' * 2)
+
+
     cursor.execute(migration.up)
-    cursor.execute('''
-INSERT INTO ''' + migration_table +''' (migration_id, up_digest, up, down_digest, down)
+    cursor.execute(f'''
+INSERT INTO {migration_table} (migration_id, up_digest, up, down_digest, down)
      VALUES (%s, %s, %s, %s, %s);
     ''', (migration.migration_id, digest(migration.up), migration.up, digest(migration.down), migration.down,)
     )
@@ -163,7 +165,7 @@ INSERT INTO ''' + migration_table +''' (migration_id, up_digest, up, down_digest
 def apply_down(cursor, migration: Migration, migration_table) -> None:
     print(migration.migration_id, migration.down, end='\n' * 2)
     cursor.execute(migration.down)
-    cursor.execute('DELETE FROM ' + migration_table +' WHERE migration_id = %s;', (migration.migration_id,))
+    cursor.execute(f'DELETE FROM {migration_table}  WHERE migration_id = {migration.migration_id};')
 
 
 def _parse_args() -> (PosixPath, DBParams, Schema):
@@ -224,7 +226,7 @@ def get_db_migrations(conn, migration_table) -> List[Migration]:
     with conn:
         # todo - namedtuple cursor
         with conn.cursor() as cursor:
-            cursor.execute('select migration_id, up_digest, up, down_digest, down from {}'.format(migration_table))
+            cursor.execute(f'select migration_id, up_digest, up, down_digest, down from {migration_table}')
             rs = cursor.fetchall()
             return [
                 Migration(
@@ -268,8 +270,8 @@ def get_diff(db_migrations: List[Migration], file_system_migrations: List[Migrat
 
 def CINE_migrations_table(cursor, migration_table) -> None:
     try:
-        cursor.execute('''
-            create table if not exists {} (
+        cursor.execute(f'''
+            create table if not exists {migration_table} (
                 migration_id int      not null primary key,
                 up_digest    char(64) not null,
                 up           text     not null,
@@ -280,7 +282,7 @@ def CINE_migrations_table(cursor, migration_table) -> None:
                 created_datetime  timestamp not null default now(),
                 modified_datetime timestamp not null default now()
             );
-                '''.format(migration_table))
+                ''')
 
     except IntegrityError as e:
         print('Migrations already in process')
