@@ -12,6 +12,7 @@ from version import __version__
 
 DBParams = namedtuple('DBParams', 'user password host port database')
 Migration = namedtuple('Migration', 'migration_id up down')
+migrations_table = "goose_migrations"
 Schema = str
 
 
@@ -83,13 +84,13 @@ def parse_migration(dir: PosixPath, migration_id: int) -> Migration:
         return migration
 
 
-def acquire_mutex(cursor, migration_table) -> None:
+def acquire_mutex(cursor) -> None:
     try:
         cursor.execute(f'''
         /* Ideal lock timeout? */
         SET lock_timeout TO '2s';    
 
-        LOCK TABLE {migration_table} IN EXCLUSIVE MODE;
+        LOCK TABLE {migrations_table} IN EXCLUSIVE MODE;
     ''')
     except OperationalError as e:
         print('Migrations already in progress')
@@ -110,7 +111,7 @@ def set_role(cursor, role: str) -> None:
     )
 
 def main() -> None:
-    migrations_directory, db_params, schema, role, migration_table = _parse_args()
+    migrations_directory, db_params, schema, role, migrations_table_name = _parse_args()
 
     assert_all_migrations_present(migrations_directory)
 
@@ -124,48 +125,52 @@ def main() -> None:
         if role is not None:
             set_role(cursor, role)
 
-        CINE_migrations_table(conn.cursor(), migration_table)
+        if migrations_table_name is not None:
+            global migrations_table
+            migrations_table = migrations_table_name
 
-        migrations_from_db: List[Migration] = sorted(get_db_migrations(conn, migration_table), key=lambda m: m.migration_id)
+        CINE_migrations_table(conn.cursor())
+
+        migrations_from_db: List[Migration] = sorted(get_db_migrations(conn), key=lambda m: m.migration_id)
         migrations_from_filesystem: List[Migration] = sorted(parse_migrations(migrations_directory), key=lambda m: m.migration_id)
 
         old_branch, new_branch = get_diff(migrations_from_db, migrations_from_filesystem)
 
-        acquire_mutex(cursor, migration_table)
+        acquire_mutex(cursor)
 
         if old_branch:
-            unapply_all(cursor, old_branch, migration_table)
-        apply_all(cursor, new_branch, migration_table)
+            unapply_all(cursor, old_branch)
+        apply_all(cursor, new_branch)
 
 
-def apply_all(cursor, migrations, migration_table) -> None:
+def apply_all(cursor, migrations) -> None:
     assert sorted(migrations, key=lambda m: m.migration_id) == migrations, 'Migrations must be applied in ascending order'
     for migration in migrations:
-        apply_up(cursor, migration, migration_table)
+        apply_up(cursor, migration)
 
 
-def unapply_all(cursor, migrations, migration_table) -> None:
+def unapply_all(cursor, migrations) -> None:
     assert sorted(migrations, key=lambda m: m.migration_id, reverse=True) == migrations, 'Migrations must be unapplied in descending order'
     for migration in migrations:
-        apply_down(cursor, migration, migration_table)
+        apply_down(cursor, migration)
 
 
-def apply_up(cursor, migration: Migration, migration_table) -> None:
+def apply_up(cursor, migration: Migration) -> None:
     print(migration.migration_id, migration.up, end='\n' * 2)
 
 
     cursor.execute(migration.up)
     cursor.execute(f'''
-INSERT INTO {migration_table} (migration_id, up_digest, up, down_digest, down)
+INSERT INTO {migrations_table} (migration_id, up_digest, up, down_digest, down)
      VALUES (%s, %s, %s, %s, %s);
     ''', (migration.migration_id, digest(migration.up), migration.up, digest(migration.down), migration.down,)
     )
 
 
-def apply_down(cursor, migration: Migration, migration_table) -> None:
+def apply_down(cursor, migration: Migration) -> None:
     print(migration.migration_id, migration.down, end='\n' * 2)
     cursor.execute(migration.down)
-    cursor.execute(f'DELETE FROM {migration_table}  WHERE migration_id = {migration.migration_id};')
+    cursor.execute(f'DELETE FROM {migrations_table}  WHERE migration_id = {migration.migration_id};')
 
 
 def _parse_args() -> (PosixPath, DBParams, Schema):
@@ -177,7 +182,7 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
     parser.add_argument('-d', '--dbname', default='postgres')
     parser.add_argument('-s', '--schema', default='public')
     parser.add_argument('-r', '--role', default=None)
-    parser.add_argument('-m', '--migrationTable', default='goose_migrations')
+    parser.add_argument('-m', '--migrations_table_name', default=None)
 
     parser.add_argument('-v', '--version', action='version',
                     version='%(prog)s {version}'.format(version=__version__))
@@ -198,7 +203,7 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
         port=args.port,
         database=args.dbname
     )
-    return migrations_directory, db_params, args.schema, args.role, args.migrationTable
+    return migrations_directory, db_params, args.schema, args.role, args.migrations_table_name
 
 
 def _get_migrations_directory(pathname: str) -> PosixPath:
@@ -222,11 +227,11 @@ def first(xs: Iterable[T]) -> Optional[T]:
         return None
 
 
-def get_db_migrations(conn, migration_table) -> List[Migration]:
+def get_db_migrations(conn) -> List[Migration]:
     with conn:
         # todo - namedtuple cursor
         with conn.cursor() as cursor:
-            cursor.execute(f'select migration_id, up_digest, up, down_digest, down from {migration_table}')
+            cursor.execute(f'select migration_id, up_digest, up, down_digest, down from {migrations_table}')
             rs = cursor.fetchall()
             return [
                 Migration(
@@ -268,10 +273,10 @@ def get_diff(db_migrations: List[Migration], file_system_migrations: List[Migrat
         return old_branch, new_branch
 
 
-def CINE_migrations_table(cursor, migration_table) -> None:
+def CINE_migrations_table(cursor) -> None:
     try:
         cursor.execute(f'''
-            create table if not exists {migration_table} (
+            create table if not exists {migrations_table} (
                 migration_id int      not null primary key,
                 up_digest    char(64) not null,
                 up           text     not null,
