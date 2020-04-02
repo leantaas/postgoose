@@ -14,7 +14,7 @@ from version import __version__
 NAME = 'postgoose'
 DESCRIPTION = 'SQL migrations for Postgres'
 URL = 'https://github.com/leantaas/postgoose'
-EMAIL = 'd.babiak@gmail.com'
+EMAIL = 'opensource@leantaas.com'
 AUTHOR = 'dmb'
 REQUIRES_PYTHON = '>=3.6.0'
 VERSION = __version__
