@@ -15,7 +15,7 @@ pip install postgoose
 ## Usage
 
 ```
-usage: goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME] [-s SCHEMA] [-r ROLE] [-m MIGRATIONS_TABLE_NAME] [-f [FAIL_ON_DOWNS]] [-v] migrations_directory
+usage: goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME] [-s SCHEMA] [-r ROLE] [-m MIGRATIONS_TABLE_NAME] [-a AUTO_APPLY_DOWN] [-v] migrations_directory
 
 positional arguments:
   migrations_directory  Path to directory containing migrations
@@ -28,8 +28,10 @@ optional arguments:
   -d DBNAME, --dbname DBNAME
   -s SCHEMA, --schema SCHEMA
   -r ROLE, --role ROLE
-  -m MIGRATIONS_TABLE_NAME, --migrations_table_name MIGRATIONS_TABLE_NAME (Default: goose_migrations)
-  -f [FAIL_ON_DOWNS], --fail_on_downs [FAIL_ON_DOWNS] (Default: True)
+  -m MIGRATIONS_TABLE_NAME, --migrations_table_name MIGRATIONS_TABLE_NAME
+                        Default is goose_migrations
+  -a AUTO_APPLY_DOWN, --auto_apply_down AUTO_APPLY_DOWN
+                        Accepts True/False, default is True
   -v, --version         show program's version number and exit
 ```
 
