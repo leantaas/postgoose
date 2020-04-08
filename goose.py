@@ -111,7 +111,7 @@ def set_role(cursor, role: str) -> None:
     )
 
 def main() -> None:
-    migrations_directory, db_params, schema, role, migrations_table_name = _parse_args()
+    migrations_directory, db_params, schema, role, migrations_table_name, fail_on_downs = _parse_args()
 
     assert_all_migrations_present(migrations_directory)
 
@@ -139,7 +139,12 @@ def main() -> None:
         acquire_mutex(cursor)
 
         if old_branch:
-            unapply_all(cursor, old_branch)
+            if fail_on_downs:
+                print(f'Failing migrations without applying downs (migration id: {old_branch[0].migration_id})')
+                exit(5)
+            else:
+                unapply_all(cursor, old_branch)
+
         apply_all(cursor, new_branch)
 
 
@@ -183,6 +188,7 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
     parser.add_argument('-s', '--schema', default='public')
     parser.add_argument('-r', '--role', default=None)
     parser.add_argument('-m', '--migrations_table_name', default=None)
+    parser.add_argument('-f', '--fail_on_downs', default=True, type=str2bool, nargs='?', const=True)
 
     parser.add_argument('-v', '--version', action='version',
                     version='%(prog)s {version}'.format(version=__version__))
@@ -203,7 +209,7 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
         port=args.port,
         database=args.dbname
     )
-    return migrations_directory, db_params, args.schema, args.role, args.migrations_table_name
+    return migrations_directory, db_params, args.schema, args.role, args.migrations_table_name, args.fail_on_downs
 
 
 def _get_migrations_directory(pathname: str) -> PosixPath:
@@ -293,6 +299,15 @@ def CINE_migrations_table(cursor) -> None:
         print('Migrations already in process')
         exit(4)
 
+def str2bool(v):
+    if isinstance(v, bool):
+       return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 if __name__ == '__main__':
     main()
