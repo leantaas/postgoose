@@ -19,9 +19,12 @@ def print_args(args_object):
 
 def print_up_down(verbose, migration, migration_type) -> None:
 
-    print(f"\nMigration ID: {migration.migration_id}")
+    migration_id = getattr(migration, 'migration_id')
+
+    print(f"\nMigration ID: {migration_id}")
     print(f"Migration Type: {migration_type}")
 
     if verbose:
+        migration = getattr(migration, migration_type)
         print("Migrations:")
-        print(migration[migration_type])
+        print(migration)
