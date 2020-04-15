@@ -82,7 +82,7 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    py_modules=['goose','version'],
+    py_modules=['goose','version','utils'],
     entry_points={
         'console_scripts': ['goose=goose:main'],
     },

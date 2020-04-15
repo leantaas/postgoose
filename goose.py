@@ -6,9 +6,10 @@ from collections import namedtuple
 from hashlib import sha256
 from pathlib import PosixPath
 from typing import List, Set, Iterable, Optional, T, Tuple
-
 from psycopg2 import connect, OperationalError, IntegrityError, sql
+
 from version import __version__
+from utils import str_to_bool, print_args, print_up_down
 
 DBParams = namedtuple("DBParams", "user password host port database")
 Migration = namedtuple("Migration", "migration_id up down")
@@ -185,18 +186,7 @@ def unapply_all(cursor, migrations) -> None:
 def apply_up(cursor, migration: Migration) -> None:
 
     global verbose
-    if verbose:
-        print(f"""
-            Migration ID: {migration.migration_id}
-            Migration Type: UP
-            Migrations:
-            {migration.up}
-        """, end="\n" * 2)
-    else:
-        print(f"""
-            Migration ID: {migration.migration_id}
-            Migration Type: UP
-        """, end="\n" * 2)
+    print_up_down(verbose, migration, "up")
 
     cursor.execute(migration.up)
     cursor.execute(
@@ -217,18 +207,7 @@ def apply_up(cursor, migration: Migration) -> None:
 def apply_down(cursor, migration: Migration) -> None:
 
     global verbose
-    if verbose:
-        print(f"""
-            Migration ID: {migration.migration_id}
-            Migration Type: DOWN
-            Migrations:
-            {migration.down}
-        """, end="\n" * 2)
-    else:
-        print(f"""
-            Migration ID: {migration.migration_id}
-            Migration Type: DOWN
-        """, end="\n" * 2)
+    print_up_down(verbose, migration, "down")
 
     cursor.execute(migration.down)
     cursor.execute(
@@ -257,14 +236,14 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
         "-a",
         "--auto_apply_down",
         default=True,
-        type=str2bool,
+        type=str_to_bool,
         help="Accepts True/False, default is True",
     )
     parser.add_argument(
         "-V",
         "--verbose",
         default=True,
-        type=str2bool,
+        type=str_to_bool,
         help="Accepts True/False, default is True",
     )
 
@@ -276,7 +255,8 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
     )
 
     args = parser.parse_args()
-    print(args)
+
+    print_args(args)
 
     if "PGPASSWORD" not in os.environ:
         print("PGPASSWORD not set")
@@ -397,17 +377,6 @@ def CINE_migrations_table(cursor) -> None:
     except IntegrityError as e:
         print("Migrations already in process")
         exit(4)
-
-
-def str2bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
 if __name__ == "__main__":
