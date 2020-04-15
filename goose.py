@@ -183,14 +183,27 @@ def unapply_all(cursor, migrations) -> None:
 
 
 def apply_up(cursor, migration: Migration) -> None:
-    print(migration.migration_id, migration.up, end="\n" * 2)
+
+    global verbose
+    if verbose:
+        print(f"""
+            Migration ID: {migration.migration_id}
+            Migration Type: UP
+            Migrations:
+            {migration.up}
+        """, end="\n" * 2)
+    else:
+        print(f"""
+            Migration ID: {migration.migration_id}
+            Migration Type: UP
+        """, end="\n" * 2)
 
     cursor.execute(migration.up)
     cursor.execute(
         f"""
-INSERT INTO {migrations_table} (migration_id, up_digest, up, down_digest, down)
-     VALUES (%s, %s, %s, %s, %s);
-    """,
+            INSERT INTO {migrations_table} (migration_id, up_digest, up, down_digest, down)
+            VALUES (%s, %s, %s, %s, %s);
+        """,
         (
             migration.migration_id,
             digest(migration.up),
@@ -202,7 +215,21 @@ INSERT INTO {migrations_table} (migration_id, up_digest, up, down_digest, down)
 
 
 def apply_down(cursor, migration: Migration) -> None:
-    print(migration.migration_id, migration.down, end="\n" * 2)
+
+    global verbose
+    if verbose:
+        print(f"""
+            Migration ID: {migration.migration_id}
+            Migration Type: DOWN
+            Migrations:
+            {migration.down}
+        """, end="\n" * 2)
+    else:
+        print(f"""
+            Migration ID: {migration.migration_id}
+            Migration Type: DOWN
+        """, end="\n" * 2)
+
     cursor.execute(migration.down)
     cursor.execute(
         f"DELETE FROM {migrations_table}  WHERE migration_id = {migration.migration_id};"
