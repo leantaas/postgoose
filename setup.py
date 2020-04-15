@@ -9,7 +9,7 @@ from shutil import rmtree
 
 from setuptools import find_packages, setup, Command
 
-from version import __version__
+from goose_version import __version__
 
 NAME = 'postgoose'
 DESCRIPTION = 'SQL migrations for Postgres'
@@ -82,7 +82,7 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    py_modules=['goose','version','utils'],
+    py_modules=['goose','goose_version','goose_utils'],
     entry_points={
         'console_scripts': ['goose=goose:main'],
     },

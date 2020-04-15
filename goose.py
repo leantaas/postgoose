@@ -8,8 +8,8 @@ from pathlib import PosixPath
 from typing import List, Set, Iterable, Optional, T, Tuple
 from psycopg2 import connect, OperationalError, IntegrityError, sql
 
-from version import __version__
-from utils import str_to_bool, print_args, print_up_down
+from goose_version import __version__
+from goose_utils import str_to_bool, print_args, print_up_down
 
 DBParams = namedtuple("DBParams", "user password host port database")
 Migration = namedtuple("Migration", "migration_id up down")
