@@ -87,9 +87,9 @@ def parse_migration(dir: PosixPath, migration_id: int) -> Migration:
         migration = Migration(
             migration_id=migration_id,
             up_digest=up_digest,
-            up=up_fp.read(),
+            up=up,
             down_digest=down_digest,
-            down=down_fp.read(),
+            down=down,
         )
         return migration
 
@@ -304,13 +304,6 @@ def digest(s: str) -> str:
     return sha256(s.encode("utf-8")).hexdigest()
 
 
-def first(xs: Iterable[T]) -> Optional[T]:
-    try:
-        return next(iter(xs))
-    except StopIteration:
-        return None
-
-
 def get_db_migrations(conn) -> List[Migration]:
     with conn:
         # todo - namedtuple cursor
@@ -331,11 +324,23 @@ def get_diff(
 
     global strict_digest_check
 
-    first_divergence: Optional[Migration] = first(
-        db_migration
-        for db_migration, fs_migration in zip(db_migrations, file_system_migrations)
-        if (strict_digest_check and (digest(db_migration.up) != digest(fs_migration.up))) or (!strict_digest_check and (db_migration.up_digest != fs_migration.up_digest))
-    )
+    first_divergence = None
+
+    for db_migration, file_migration in zip(db_migrations, file_system_migrations):
+
+        if strict_digest_check:
+            db_digest = digest(db_migration.up)
+            file_digest = digest(file_migration.up)
+        else:
+            db_digest = db_migration.up_digest
+            file_digest = file_migration.up_digest
+
+        if db_digest != file_digest:
+            print(f"\nDivergence found at: {db_migration.migration_id}")
+            print(f"  DB Migration Digest: {db_digest}")
+            print(f"File Migration Digest: {file_digest}")
+            first_divergence = db_migration
+            break
 
     if first_divergence:
         old_branch = sorted(
