@@ -17,7 +17,8 @@ pip install postgoose
 ## Usage
 
 ```
-usage: goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME] [-s SCHEMA] [-r ROLE] [--strict_digest_check STRICT_DIGEST_CHECK]
+usage: goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME]
+             [-s SCHEMA] [-r ROLE] [--strict_digest_check STRICT_DIGEST_CHECK]
              [-m MIGRATIONS_TABLE_NAME] [-a AUTO_APPLY_DOWN] [-V VERBOSE] [-v]
              migrations_directory
 
@@ -32,14 +33,20 @@ optional arguments:
   -d DBNAME, --dbname DBNAME
   -s SCHEMA, --schema SCHEMA
   -r ROLE, --role ROLE
+
   --strict_digest_check STRICT_DIGEST_CHECK
-                        Set Flase to compare with saved digest instead of re-computing digest. Default is True
+                        Set Flase to compare with saved digest instead of re-computing digest.
+                        Default is True
+
   -m MIGRATIONS_TABLE_NAME, --migrations_table_name MIGRATIONS_TABLE_NAME
                         Default is goose_migrations
+
   -a AUTO_APPLY_DOWN, --auto_apply_down AUTO_APPLY_DOWN
                         Accepts True/False, default is True
+
   -V VERBOSE, --verbose VERBOSE
                         Accepts True/False, default is True
+
   -v, --version         show program's version number and exit
 ```
 
