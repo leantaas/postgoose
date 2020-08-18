@@ -12,19 +12,20 @@ from goose_version import __version__
 from goose_utils import str_to_bool, print_args, print_up_down
 
 DBParams = namedtuple("DBParams", "user password host port database")
-Migration = namedtuple("Migration", "migration_id up down")
+Migration = namedtuple("Migration", "migration_id up_digest up down_digest down")
+Schema = str
+
+# Defaults
 migrations_table = "goose_migrations"
 verbose = True
-Schema = str
+strict_digest_check = True
 
 
 def get_migration_id(file_name: str) -> int:
     try:
         return int(file_name[: file_name.index("_")])
     except ValueError:
-        print(
-            f'ERROR: File "{file_name}" is not of pattern "(id)_up.sql" or "(id)_down.sql"'
-        )
+        print(f'ERROR: File "{file_name}" is not of pattern "(id)_up.sql" or "(id)_down.sql"')
         exit(3)
 
 
@@ -33,9 +34,7 @@ def get_max_migration_id(filenames: List[str]) -> int:
 
 
 def get_migration_files_filtered(dir: PosixPath) -> List[str]:
-    return [
-        file for file in os.listdir(dir.as_posix()) if file.lower().endswith(".sql")
-    ]
+    return [file for file in os.listdir(dir.as_posix()) if file.lower().endswith(".sql")]
 
 
 def assert_all_migrations_present(dir: PosixPath) -> None:
@@ -48,12 +47,8 @@ def assert_all_migrations_present(dir: PosixPath) -> None:
 
     for migration_id in range(1, max_migration_id + 1):
         # todo - assertions can be ignored...?
-        assert (
-            f"{migration_id}_up.sql" in filenames
-        ), f"Migration {migration_id} missing ups"
-        assert (
-            f"{migration_id}_down.sql" in filenames
-        ), f"Migration {migration_id} missing downs"
+        assert f"{migration_id}_up.sql" in filenames, f"Migration {migration_id} missing ups"
+        assert f"{migration_id}_down.sql" in filenames, f"Migration {migration_id} missing downs"
 
     extra_files: Set[str] = (
         set(filenames)
@@ -72,8 +67,7 @@ def parse_migrations(dir: PosixPath) -> List[Migration]:
     max_migration_id: int = get_max_migration_id(filenames)
 
     migrations: List[Migration] = [
-        parse_migration(dir, migration_id)
-        for migration_id in range(1, max_migration_id + 1)
+        parse_migration(dir, migration_id) for migration_id in range(1, max_migration_id + 1)
     ]
 
     return migrations
@@ -84,8 +78,18 @@ def parse_migration(dir: PosixPath, migration_id: int) -> Migration:
     down_file: PosixPath = dir.joinpath(f"{migration_id}_down.sql")
 
     with open(up_file) as up_fp, open(down_file) as down_fp:
+
+        up = up_fp.read()
+        up_digest = digest(up)
+        down = down_fp.read()
+        down_digest = digest(down)
+
         migration = Migration(
-            migration_id=migration_id, up=up_fp.read(), down=down_fp.read()
+            migration_id=migration_id,
+            up_digest=up_digest,
+            up=up_fp.read(),
+            down_digest=down_digest,
+            down=down_fp.read(),
         )
         return migration
 
@@ -148,9 +152,7 @@ def main() -> None:
             parse_migrations(migrations_directory), key=lambda m: m.migration_id
         )
 
-        old_branch, new_branch = get_diff(
-            migrations_from_db, migrations_from_filesystem
-        )
+        old_branch, new_branch = get_diff(migrations_from_db, migrations_from_filesystem)
 
         acquire_mutex(cursor)
 
@@ -217,9 +219,7 @@ def apply_down(cursor, migration: Migration) -> None:
 
 def _parse_args() -> (PosixPath, DBParams, Schema):
     parser = ArgumentParser()
-    parser.add_argument(
-        "migrations_directory", help="Path to directory containing migrations"
-    )
+    parser.add_argument("migrations_directory", help="Path to directory containing migrations")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("-p", "--port", default=5432, type=int)
     parser.add_argument("-U", "--username", default="postgres")
@@ -227,10 +227,13 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
     parser.add_argument("-s", "--schema", default="public")
     parser.add_argument("-r", "--role", default=None)
     parser.add_argument(
-        "-m",
-        "--migrations_table_name",
-        default=None,
-        help="Default is goose_migrations",
+        "--strict_digest_check",
+        default=True,
+        type=str_to_bool,
+        help="Set Flase to compare with saved digest instead of re-computing digest. Default is True",
+    )
+    parser.add_argument(
+        "-m", "--migrations_table_name", default=None, help="Default is goose_migrations",
     )
     parser.add_argument(
         "-a",
@@ -264,6 +267,9 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
 
     global verbose
     verbose = args.verbose
+
+    global strict_digest_check
+    strict_digest_check = args.strict_digest_check
 
     migrations_directory = _get_migrations_directory(args.migrations_directory)
 
@@ -313,42 +319,38 @@ def get_db_migrations(conn) -> List[Migration]:
                 f"select migration_id, up_digest, up, down_digest, down from {migrations_table}"
             )
             rs = cursor.fetchall()
-            return [Migration(migration_id=r[0], up=r[2], down=r[4]) for r in rs]
+            return [
+                Migration(migration_id=r[0], up_digest=r[1], up=r[2], down_digest=r[3], down=r[4])
+                for r in rs
+            ]
 
 
 def get_diff(
     db_migrations: List[Migration], file_system_migrations: List[Migration]
 ) -> Tuple[List[Migration], List[Migration]]:
+
+    global strict_digest_check
+
     first_divergence: Optional[Migration] = first(
         db_migration
         for db_migration, fs_migration in zip(db_migrations, file_system_migrations)
-        if digest(db_migration.up) != digest(fs_migration.up)
+        if (strict_digest_check and (digest(db_migration.up) != digest(fs_migration.up))) or (!strict_digest_check and (db_migration.up_digest != fs_migration.up_digest))
     )
 
     if first_divergence:
         old_branch = sorted(
-            [
-                m
-                for m in db_migrations
-                if m.migration_id >= first_divergence.migration_id
-            ],
+            [m for m in db_migrations if m.migration_id >= first_divergence.migration_id],
             key=lambda m: m.migration_id,
             reverse=True,
         )
         new_branch = sorted(
-            [
-                m
-                for m in file_system_migrations
-                if m.migration_id >= first_divergence.migration_id
-            ],
+            [m for m in file_system_migrations if m.migration_id >= first_divergence.migration_id],
             key=lambda m: m.migration_id,
         )
         return old_branch, new_branch
     else:
         old_branch = []
-        max_old_id = (
-            0 if not db_migrations else max(m.migration_id for m in db_migrations)
-        )
+        max_old_id = 0 if not db_migrations else max(m.migration_id for m in db_migrations)
         new_branch = sorted(
             [m for m in file_system_migrations if m.migration_id > max_old_id],
             key=lambda m: m.migration_id,
