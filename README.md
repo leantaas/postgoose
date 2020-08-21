@@ -3,11 +3,13 @@
 # SQL migrations for Postgres
 
 ```
-PGPASSWORD=top-secret goose ./tests/master_migrations  
+PGPASSWORD=top-secret goose ./tests/master_migrations
 ```
+
 (Assuming you have a Postgres server running on `localhost:5432` with a high-entropy admin password)
 
 ## Installation
+
 ```
 pip install postgoose
 ```
@@ -15,7 +17,10 @@ pip install postgoose
 ## Usage
 
 ```
-usage: goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME] [-s SCHEMA] [-r ROLE] [-m MIGRATIONS_TABLE_NAME] [-a AUTO_APPLY_DOWN] [-v] migrations_directory
+usage: goose [-h] [--host HOST] [-p PORT] [-U USERNAME] [-d DBNAME]
+             [-s SCHEMA] [-r ROLE] [--strict_digest_check STRICT_DIGEST_CHECK]
+             [-m MIGRATIONS_TABLE_NAME] [-a AUTO_APPLY_DOWN] [-V VERBOSE] [-v]
+             migrations_directory
 
 positional arguments:
   migrations_directory  Path to directory containing migrations
@@ -28,14 +33,25 @@ optional arguments:
   -d DBNAME, --dbname DBNAME
   -s SCHEMA, --schema SCHEMA
   -r ROLE, --role ROLE
+
+  --strict_digest_check STRICT_DIGEST_CHECK
+                        Set Flase to compare with saved digest instead of re-computing digest.
+                        Default is True
+
   -m MIGRATIONS_TABLE_NAME, --migrations_table_name MIGRATIONS_TABLE_NAME
                         Default is goose_migrations
+
   -a AUTO_APPLY_DOWN, --auto_apply_down AUTO_APPLY_DOWN
                         Accepts True/False, default is True
+
+  -V VERBOSE, --verbose VERBOSE
+                        Accepts True/False, default is True
+
   -v, --version         show program's version number and exit
 ```
 
 Where `migrations_directory` is some directory of form:
+
 ```
 ./migrations
   1_up.sql
@@ -49,20 +65,23 @@ Where `migrations_directory` is some directory of form:
 Current main difference from Play Framework migrations is that a migration in Goose is all-or-nothing.
 
 E.g. you are on master branch on revision 5 and want to switch to a feature branch whose latest revision is 4'.
+
 ```
-1 <- 2 <- 3 <- 4 <- 5  
+1 <- 2 <- 3 <- 4 <- 5
        \
-         3' <- 4' 
+         3' <- 4'
+
 ```
-Applying migrations through Goose will leave you on either revision 5 (if an error is encountered) or revision 4' (if migration is successful) but not on any of 4, 3, 2, or 3'. 
+
+Applying migrations through Goose will leave you on either revision 5 (if an error is encountered) or revision 4' (if migration is successful) but not on any of 4, 3, 2, or 3'.
 
 ## Testing on local machine
 
-  * Check `docs/testing.md`
+- Check `docs/testing.md`
 
 ## License
 
-Copyright 2018 LeanTaas, Inc. 
+Copyright 2018 LeanTaas, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
