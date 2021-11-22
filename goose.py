@@ -118,14 +118,92 @@ def set_role(cursor, role: str) -> None:
 
 
 def main() -> None:
-    (
+    parser = ArgumentParser()
+    parser.add_argument("migrations_directory",
+        help="Path to directory containing migrations")
+    parser.add_argument("-h", "--host", default="127.0.0.1")
+    parser.add_argument("-p", "--port", default=5432, type=int)
+    parser.add_argument("-U", "--username", default="postgres")
+    parser.add_argument("-d", "--dbname", default="postgres")
+    parser.add_argument("-s", "--schema", default="public")
+    parser.add_argument("-r", "--role", default=None)
+    parser.add_argument(
+        "--strict_digest_check",
+        default=True,
+        type=str_to_bool,
+        help="Set False to compare with saved digest "
+        "instead of re-computing digest. Default is True",
+    )
+    parser.add_argument(
+        "-m", 
+        "--migrations_table_name",
+        default=None,
+        help="Default is goose_migrations",
+    )
+    parser.add_argument(
+        "-a",
+        "--auto_apply_down",
+        default=True,
+        type=str_to_bool,
+        help="Accepts True/False, default is True",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        default=True,
+        type=str_to_bool,
+        help="Accepts True/False, default is True",
+    )
+
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version="%(prog)s {version}".format(version=__version__),
+    )
+
+    args = parser.parse_args()
+
+    print_args(args)
+
+    if "PGPASSWORD" not in os.environ:
+        print("PGPASSWORD not set")
+        exit(1)
+
+    global verbose
+    verbose = args.verbose
+
+    global strict_digest_check
+    strict_digest_check = args.strict_digest_check
+
+    migrations_directory = _get_migrations_directory(args.migrations_directory)
+
+    db_params = DBParams(
+        user=args.username,
+        password=os.environ["PGPASSWORD"],
+        host=args.host,
+        port=args.port,
+        database=args.dbname
+    )
+
+    run_migrations(
         migrations_directory,
         db_params,
-        schema,
-        role,
-        migrations_table_name,
-        auto_apply_down,
-    ) = _parse_args()
+        args.schema,
+        args.role,
+        args.migrations_table_name,
+        args.auto_apply_down
+    )
+
+
+def run_migrations(
+    migrations_directory,
+    db_params,
+    schema,
+    role,
+    migrations_table_name,
+    auto_apply_down
+):
 
     assert_all_migrations_present(migrations_directory)
 
@@ -219,8 +297,9 @@ def apply_down(cursor, migration: Migration) -> None:
 
 def _parse_args() -> (PosixPath, DBParams, Schema):
     parser = ArgumentParser()
-    parser.add_argument("migrations_directory", help="Path to directory containing migrations")
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("migrations_directory",
+        help="Path to directory containing migrations")
+    parser.add_argument("-h", "--host", default="127.0.0.1")
     parser.add_argument("-p", "--port", default=5432, type=int)
     parser.add_argument("-U", "--username", default="postgres")
     parser.add_argument("-d", "--dbname", default="postgres")
@@ -230,10 +309,14 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
         "--strict_digest_check",
         default=True,
         type=str_to_bool,
-        help="Set Flase to compare with saved digest instead of re-computing digest. Default is True",
+        help="Set False to compare with saved digest "
+        "instead of re-computing digest. Default is True",
     )
     parser.add_argument(
-        "-m", "--migrations_table_name", default=None, help="Default is goose_migrations",
+        "-m", 
+        "--migrations_table_name",
+        default=None,
+        help="Default is goose_migrations",
     )
     parser.add_argument(
         "-a",
@@ -243,7 +326,7 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
         help="Accepts True/False, default is True",
     )
     parser.add_argument(
-        "-V",
+        "-v",
         "--verbose",
         default=True,
         type=str_to_bool,
@@ -251,7 +334,7 @@ def _parse_args() -> (PosixPath, DBParams, Schema):
     )
 
     parser.add_argument(
-        "-v",
+        "-V",
         "--version",
         action="version",
         version="%(prog)s {version}".format(version=__version__),
