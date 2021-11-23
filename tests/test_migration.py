@@ -1,4 +1,7 @@
 # Run this script like so: PYTHONPATH=. pytest --postgresql-port=32777 --postgresql-password=mysecretpassword -rP
+# TODO: Convert migration run to fixture and add verification tests
+# TODO: Add test for empty down files
+# TODO: Add readme for postgresql database instance suggestions (Docker-compose)
 import os
 import time
 
@@ -7,8 +10,7 @@ from pytest_postgresql import factories
 
 from goose import run_migrations, DBParams
 
-postgresql_in_docker = factories.postgresql_noproc(
-    dbname='test_db', load=['tests/setup/create-schema.sql'])
+postgresql_in_docker = factories.postgresql_noproc(dbname='test_db')
 postgresql = factories.postgresql("postgresql_in_docker", dbname='test_db')
 
 
@@ -26,13 +28,11 @@ def db_params(postgresql):
 
 def test_migrations(db_params):
     """Run migrations"""
-    schema = 'schema_1'
     migrations_directory = 'tests/branch_migrations'
     print(db_params)
     run_migrations(
         migrations_directory,
-        db_params,
-        schema
+        db_params
     )
     # cur = postgresql.cursor()
     # cur.execute(
