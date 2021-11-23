@@ -8,6 +8,7 @@ from pathlib import PosixPath
 from typing import List, Set, Iterable, Optional, T, Tuple
 from psycopg2 import connect, OperationalError, IntegrityError, sql
 
+from app_logger import get_app_logger
 from goose_version import __version__
 from goose_utils import str_to_bool, print_args, print_up_down
 
@@ -20,13 +21,16 @@ migrations_table = "goose_migrations"
 verbose = True
 strict_digest_check = True
 
+logger = get_app_logger()
+
 
 def get_migration_id(file_name: str) -> int:
     try:
-        return int(file_name[: file_name.index("_")])
+        return int(file_name.split('_')[0])
     except ValueError:
-        print(f'ERROR: File "{file_name}" is not of pattern "(id)_up.sql" or "(id)_down.sql"')
-        exit(3)
+        raise RuntimeError(
+            f'ERROR: File "{file_name}" is not of pattern '
+            '"(id)_up.sql" or "(id)_down.sql"')
 
 
 def get_max_migration_id(filenames: List[str]) -> int:
@@ -40,8 +44,8 @@ def get_migration_files_filtered(dir: PosixPath) -> List[str]:
 def assert_all_migrations_present(dir: PosixPath) -> None:
     filenames: List[str] = get_migration_files_filtered(dir)
     if not filenames:
-        print(f"Migrations folder {dir} is empty. Exiting gracefully!")
-        exit(0)
+        logger.warning(f"Migrations folder {dir} is empty. Exiting gracefully!")
+        return
 
     max_migration_id = get_max_migration_id(filenames)
 
@@ -57,7 +61,7 @@ def assert_all_migrations_present(dir: PosixPath) -> None:
     )
 
     if extra_files:
-        print('ERROR: Extra files not of pattern "(id)_up.sql" or "(id)_down.sql": ')
+        logger.error(f'Extra files not of pattern "<id>_up.sql" or "<id>_down.sql": ')
         print(*extra_files, sep="\n")
         exit(3)
 
@@ -176,8 +180,6 @@ def main() -> None:
     global strict_digest_check
     strict_digest_check = args.strict_digest_check
 
-    migrations_directory = _get_migrations_directory(args.migrations_directory)
-
     db_params = DBParams(
         user=args.username,
         password=os.environ["PGPASSWORD"],
@@ -199,11 +201,13 @@ def main() -> None:
 def run_migrations(
     migrations_directory,
     db_params,
-    schema,
-    role,
-    migrations_table_name,
-    auto_apply_down
+    schema='public',
+    role=None,
+    migrations_table_name=None,
+    auto_apply_down=True
 ):
+
+    migrations_directory = _get_migrations_directory(migrations_directory)
 
     assert_all_migrations_present(migrations_directory)
 
@@ -295,84 +299,6 @@ def apply_down(cursor, migration: Migration) -> None:
     )
 
 
-def _parse_args() -> (PosixPath, DBParams, Schema):
-    parser = ArgumentParser()
-    parser.add_argument("migrations_directory",
-        help="Path to directory containing migrations")
-    parser.add_argument("-h", "--host", default="127.0.0.1")
-    parser.add_argument("-p", "--port", default=5432, type=int)
-    parser.add_argument("-U", "--username", default="postgres")
-    parser.add_argument("-d", "--dbname", default="postgres")
-    parser.add_argument("-s", "--schema", default="public")
-    parser.add_argument("-r", "--role", default=None)
-    parser.add_argument(
-        "--strict_digest_check",
-        default=True,
-        type=str_to_bool,
-        help="Set False to compare with saved digest "
-        "instead of re-computing digest. Default is True",
-    )
-    parser.add_argument(
-        "-m", 
-        "--migrations_table_name",
-        default=None,
-        help="Default is goose_migrations",
-    )
-    parser.add_argument(
-        "-a",
-        "--auto_apply_down",
-        default=True,
-        type=str_to_bool,
-        help="Accepts True/False, default is True",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        default=True,
-        type=str_to_bool,
-        help="Accepts True/False, default is True",
-    )
-
-    parser.add_argument(
-        "-V",
-        "--version",
-        action="version",
-        version="%(prog)s {version}".format(version=__version__),
-    )
-
-    args = parser.parse_args()
-
-    print_args(args)
-
-    if "PGPASSWORD" not in os.environ:
-        print("PGPASSWORD not set")
-        exit(1)
-
-    global verbose
-    verbose = args.verbose
-
-    global strict_digest_check
-    strict_digest_check = args.strict_digest_check
-
-    migrations_directory = _get_migrations_directory(args.migrations_directory)
-
-    db_params = DBParams(
-        user=args.username,
-        password=os.environ["PGPASSWORD"],
-        host=args.host,
-        port=args.port,
-        database=args.dbname,
-    )
-    return (
-        migrations_directory,
-        db_params,
-        args.schema,
-        args.role,
-        args.migrations_table_name,
-        args.auto_apply_down,
-    )
-
-
 def _get_migrations_directory(pathname: str) -> PosixPath:
     migrations_directory = PosixPath(pathname).absolute()
 
@@ -388,21 +314,21 @@ def digest(s: str) -> str:
 
 
 def get_db_migrations(conn) -> List[Migration]:
-    with conn:
-        # todo - namedtuple cursor
-        with conn.cursor() as cursor:
-            cursor.execute(
-                f"select migration_id, up_digest, up, down_digest, down from {migrations_table}"
-            )
-            rs = cursor.fetchall()
-            return [
-                Migration(migration_id=r[0], up_digest=r[1], up=r[2], down_digest=r[3], down=r[4])
-                for r in rs
-            ]
+
+    with conn.cursor() as cursor:
+        cursor.execute(
+            f"select migration_id, up_digest, up, down_digest, down from {migrations_table}"
+        )
+        rs = cursor.fetchall()
+        return [
+            Migration(migration_id=r[0], up_digest=r[1], up=r[2], down_digest=r[3], down=r[4])
+            for r in rs
+        ]
 
 
 def get_diff(
-    db_migrations: List[Migration], file_system_migrations: List[Migration]
+    db_migrations: List[Migration],
+    file_system_migrations: List[Migration]
 ) -> Tuple[List[Migration], List[Migration]]:
 
     global strict_digest_check
