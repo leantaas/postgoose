@@ -1,5 +1,4 @@
 # Run this script like so: PYTHONPATH=. pytest --postgresql-port=32777 --postgresql-password=mysecretpassword -rP
-# TODO: Convert migration run to fixture and add verification tests
 # TODO: Add test for empty down files
 # TODO: Add readme for postgresql database instance suggestions (Docker-compose)
 import os
@@ -26,10 +25,10 @@ def db_params(postgresql):
     return db_params
 
 
-def test_migrations(db_params):
+@pytest.fixture
+def apply_migrations(db_params):
     """Run migrations"""
     migrations_directory = 'tests/branch_migrations'
-    print(db_params)
     run_migrations(
         migrations_directory,
         db_params
@@ -39,4 +38,27 @@ def test_migrations(db_params):
     #     "CREATE TABLE test (id serial PRIMARY KEY, num integer, data varchar);"
     # )
     # postgresql.commit()
-    breakpoint()
+
+
+def test_xs_migrations(apply_migrations, postgresql):
+    cur = postgresql.cursor()
+    cur.execute('SELECT * FROM xs;')
+    response = cur.fetchall()
+    assert response == [('a',), ('b',), ('c',), ('d',)]
+    cur.close()
+
+
+def test_ys_migrations(apply_migrations, postgresql):
+    cur = postgresql.cursor()
+    cur.execute('SELECT * FROM ys;')
+    response = cur.fetchall()
+    assert response == [
+        (1, 'a'),
+        (2, 'a'),
+        (3, 'b'),
+        (4, 'c'),
+        (5, 'c'),
+        (6, 'c'),
+        (7, 'd')
+    ]
+    cur.close()
