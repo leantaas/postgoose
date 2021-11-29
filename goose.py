@@ -2,7 +2,6 @@
 
 import os
 from argparse import ArgumentParser
-from collections import namedtuple
 from hashlib import sha256
 from pathlib import PosixPath
 from typing import List, Set, Iterable, Optional, T, Tuple
@@ -10,10 +9,9 @@ from psycopg2 import connect, OperationalError, IntegrityError, sql
 
 from app_logger import get_app_logger
 from goose_version import __version__
-from goose_utils import str_to_bool, print_args, print_up_down
+from goose_utils import print_args, print_up_down, DBParams, Migration
+    
 
-DBParams = namedtuple("DBParams", "user password host port database")
-Migration = namedtuple("Migration", "migration_id up_digest up down_digest down")
 Schema = str
 
 # Defaults
@@ -125,16 +123,16 @@ def main() -> None:
     parser = ArgumentParser()
     parser.add_argument("migrations_directory",
         help="Path to directory containing migrations")
-    parser.add_argument("-h", "--host", default="127.0.0.1")
+    parser.add_argument("-H", "--host", default="127.0.0.1")
     parser.add_argument("-p", "--port", default=5432, type=int)
+    parser.add_argument("-P", "--password", default=None)
     parser.add_argument("-U", "--username", default="postgres")
     parser.add_argument("-d", "--dbname", default="postgres")
     parser.add_argument("-s", "--schema", default="public")
     parser.add_argument("-r", "--role", default=None)
     parser.add_argument(
         "--strict_digest_check",
-        default=True,
-        type=str_to_bool,
+        action="store_false",
         help="Set False to compare with saved digest "
         "instead of re-computing digest. Default is True",
     )
@@ -145,51 +143,49 @@ def main() -> None:
         help="Default is goose_migrations",
     )
     parser.add_argument(
-        "-a",
         "--auto_apply_down",
-        default=True,
-        type=str_to_bool,
-        help="Accepts True/False, default is True",
+        action="store_true",
+        help="Will automatically apply down files",
     )
     parser.add_argument(
         "-v",
         "--verbose",
-        default=True,
-        type=str_to_bool,
-        help="Accepts True/False, default is True",
+        action="store_true",
+        help="Causes output to be verbose",
     )
 
     parser.add_argument(
         "-V",
         "--version",
         action="version",
-        version="%(prog)s {version}".format(version=__version__),
+        version=f"%(prog)s {__version__}",
     )
 
     args = parser.parse_args()
 
     print_args(args)
 
-    if "PGPASSWORD" not in os.environ:
-        print("PGPASSWORD not set")
-        exit(1)
+    password = args.password or os.getenv("PGPASSWORD")
+
+    if not password:
+        raise RuntimeError("PGPASSWORD not set")
 
     global verbose
-    verbose = args.verbose
-
     global strict_digest_check
+
+    verbose = args.verbose
     strict_digest_check = args.strict_digest_check
 
     db_params = DBParams(
         user=args.username,
-        password=os.environ["PGPASSWORD"],
+        password=password,
         host=args.host,
         port=args.port,
         database=args.dbname
     )
 
     run_migrations(
-        migrations_directory,
+        args.migrations_directory,
         db_params,
         args.schema,
         args.role,
@@ -204,14 +200,14 @@ def run_migrations(
     schema='public',
     role=None,
     migrations_table_name=None,
-    auto_apply_down=True
+    auto_apply_down=False
 ):
 
     migrations_directory = _get_migrations_directory(migrations_directory)
 
     assert_all_migrations_present(migrations_directory)
 
-    conn = connect(**db_params._asdict())
+    conn = connect(**vars(db_params))
 
     with conn:
         cursor = conn.cursor()

@@ -1,4 +1,6 @@
 # Run this script like so: PYTHONPATH=. pytest --postgresql-port=32777 --postgresql-password=mysecretpassword -rP
+# TODO: Apply migrations without making that a param in tests
+# TODO: Add a command line based test to verify parameter handling
 # TODO: Add test for empty down files
 # TODO: Add readme for postgresql database instance suggestions (Docker-compose)
 import os
@@ -33,12 +35,6 @@ def apply_migrations(db_params):
         migrations_directory,
         db_params
     )
-    # cur = postgresql.cursor()
-    # cur.execute(
-    #     "CREATE TABLE test (id serial PRIMARY KEY, num integer, data varchar);"
-    # )
-    # postgresql.commit()
-
 
 def test_xs_migrations(apply_migrations, postgresql):
     cur = postgresql.cursor()
