@@ -1,4 +1,5 @@
 # TODO: Add a command line based test to verify parameter handling
+import os
 
 import pytest
 from pytest_postgresql import factories
@@ -80,4 +81,29 @@ def test_up_down_migrations(
             (6, 'c'),
             (7, 'd'),
             (8, 'd')
+        ]
+
+def test_cmd_migrations(
+    db_params,
+    verbose,
+    auto_apply_down,
+    strict_digest_check,
+    postgresql
+):
+    return_code = os.system(f'''
+        goose {db_params}{" --verbose" if verbose else ''}{" --no_strict_digest_check" if not strict_digest_check else ''}{" --auto_apply_down" if auto_apply_down else ''} \
+            ./tests/branch_migrations
+    ''')
+    assert return_code == 0
+    with postgresql.cursor() as cur:
+        cur.execute('SELECT * FROM ys;')
+        response = cur.fetchall()
+        assert response == [
+            (1, 'a'),
+            (2, 'a'),
+            (3, 'b'),
+            (4, 'c'),
+            (5, 'c'),
+            (6, 'c'),
+            (7, 'd')
         ]

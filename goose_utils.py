@@ -13,6 +13,11 @@ class DBParams:
     port: int
     database: str
 
+    def __str__(self):
+        return ' '.join(
+            f'--{param}={value}' for param, value in vars(self).items()
+        )
+
 
 @dataclass
 class Migration:

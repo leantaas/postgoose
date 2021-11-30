@@ -124,7 +124,7 @@ def main() -> None:
     parser.add_argument("-p", "--port", default=5432, type=int)
     parser.add_argument("-P", "--password", default=None)
     parser.add_argument("-U", "--username", default="postgres")
-    parser.add_argument("-d", "--dbname", default="postgres")
+    parser.add_argument("-d", "--database", default="postgres")
     parser.add_argument("-s", "--schema", default="public")
     parser.add_argument("-r", "--role", default=None)
     parser.add_argument(
@@ -173,7 +173,7 @@ def main() -> None:
         password=password,
         host=args.host,
         port=args.port,
-        database=args.dbname
+        database=args.database
     )
 
     run_migrations(
