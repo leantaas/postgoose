@@ -128,8 +128,9 @@ def main() -> None:
     parser.add_argument("-s", "--schema", default="public")
     parser.add_argument("-r", "--role", default=None)
     parser.add_argument(
-        "--strict_digest_check",
+        "--no_strict_digest_check",
         action="store_false",
+        dest='strict_digest_check',
         help="Set False to compare with saved digest "
         "instead of re-computing digest. Default is True",
     )
