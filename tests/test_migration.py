@@ -49,7 +49,6 @@ def apply_branch_migrations(db_params, verbose, auto_apply_down, strict_digest_c
         verbose=verbose,
         strict_digest_check=strict_digest_check
     )
-    breakpoint()
     run_migrations(
         'tests/branch_migrations2',
         db_params,
