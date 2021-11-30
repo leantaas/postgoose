@@ -16,8 +16,6 @@ Schema = str
 
 # Defaults
 migrations_table = "goose_migrations"
-verbose = True
-strict_digest_check = True
 
 logger = get_app_logger()
 
@@ -107,8 +105,7 @@ def acquire_mutex(cursor) -> None:
     """
         )
     except OperationalError as e:
-        print("Migrations already in progress")
-        exit(2)
+        raise RuntimeError("Migrations already in progress")
 
 
 def set_search_path(cursor, schema: str) -> None:
@@ -170,12 +167,6 @@ def main() -> None:
     if not password:
         raise RuntimeError("PGPASSWORD not set")
 
-    global verbose
-    global strict_digest_check
-
-    verbose = args.verbose
-    strict_digest_check = args.strict_digest_check
-
     db_params = DBParams(
         user=args.username,
         password=password,
@@ -190,7 +181,9 @@ def main() -> None:
         args.schema,
         args.role,
         args.migrations_table_name,
-        args.auto_apply_down
+        args.auto_apply_down,
+        args.verbose,
+        args.strict_digest_check
     )
 
 
@@ -200,8 +193,12 @@ def run_migrations(
     schema='public',
     role=None,
     migrations_table_name=None,
-    auto_apply_down=False
+    auto_apply_down=False,
+    verbose=False,
+    strict_digest_check=True
 ):
+    if verbose:
+        logger.setLevel('DEBUG')
 
     migrations_directory = _get_migrations_directory(migrations_directory)
 
@@ -230,7 +227,11 @@ def run_migrations(
             parse_migrations(migrations_directory), key=lambda m: m.migration_id
         )
 
-        old_branch, new_branch = get_diff(migrations_from_db, migrations_from_filesystem)
+        old_branch, new_branch = get_diff(
+            migrations_from_db,
+            migrations_from_filesystem,
+            strict_digest_check
+        )
 
         acquire_mutex(cursor)
 
@@ -238,12 +239,10 @@ def run_migrations(
             if auto_apply_down:
                 unapply_all(cursor, old_branch)
             else:
-                print("\nError:")
-                print("    -a / --auto_apply_down flag is set to false")
-                print("    Failing migrations.")
-                print(f"    Failed at migration number: {old_branch[0].migration_id}")
-                exit(5)
-
+                logger.error("-a / --auto_apply_down flag is set to false")
+                raise RuntimeError(
+                    f"failed at migration number: {old_branch[0].migration_id}"
+                )
         apply_all(cursor, new_branch)
 
 
@@ -256,6 +255,7 @@ def apply_all(cursor, migrations) -> None:
 
 
 def unapply_all(cursor, migrations) -> None:
+    logger.warning(f'Unapplying migrations: {migrations}')
     assert (
         sorted(migrations, key=lambda m: m.migration_id, reverse=True) == migrations
     ), "Migrations must be unapplied in descending order"
@@ -265,8 +265,7 @@ def unapply_all(cursor, migrations) -> None:
 
 def apply_up(cursor, migration: Migration) -> None:
 
-    global verbose
-    print_up_down(verbose, migration, "up")
+    print_up_down(migration, "up")
 
     cursor.execute(migration.up)
     cursor.execute(
@@ -285,11 +284,12 @@ def apply_up(cursor, migration: Migration) -> None:
 
 
 def apply_down(cursor, migration: Migration) -> None:
-
-    global verbose
-    print_up_down(verbose, migration, "down")
-
-    cursor.execute(migration.down)
+    logger.warning(f'Applying down migration: {migration.down}')
+    print_up_down(migration, "down")
+    
+    # skip empty down migrations
+    if migration.down:
+        cursor.execute(migration.down)
     cursor.execute(
         f"DELETE FROM {migrations_table}  WHERE migration_id = {migration.migration_id};"
     )
@@ -299,8 +299,9 @@ def _get_migrations_directory(pathname: str) -> PosixPath:
     migrations_directory = PosixPath(pathname).absolute()
 
     if not migrations_directory.is_dir():
-        print(f"ERROR: {migrations_directory.as_posix()} is not a directory")
-        exit(1)
+        raise RuntimeError(
+            f"{migrations_directory.as_posix()} is not a directory"
+        )
     else:
         return migrations_directory
 
@@ -317,17 +318,22 @@ def get_db_migrations(conn) -> List[Migration]:
         )
         rs = cursor.fetchall()
         return [
-            Migration(migration_id=r[0], up_digest=r[1], up=r[2], down_digest=r[3], down=r[4])
+            Migration(
+                migration_id=r[0],
+                up_digest=r[1],
+                up=r[2],
+                down_digest=r[3],
+                down=r[4]
+            )
             for r in rs
         ]
 
 
 def get_diff(
     db_migrations: List[Migration],
-    file_system_migrations: List[Migration]
+    file_system_migrations: List[Migration],
+    strict_digest_check: bool
 ) -> Tuple[List[Migration], List[Migration]]:
-
-    global strict_digest_check
 
     first_divergence = None
 
@@ -341,31 +347,43 @@ def get_diff(
             file_digest = file_migration.up_digest
 
         if db_digest != file_digest:
-            print(f"\nDivergence found at: {db_migration.migration_id}")
-            print(f"  DB Migration Digest: {db_digest}")
-            print(f"File Migration Digest: {file_digest}")
+            logger.info(f"\nDivergence found at: {db_migration.migration_id}")
+            logger.info(f"  DB Migration Digest: {db_digest}")
+            logger.info(f"File Migration Digest: {file_digest}")
             first_divergence = db_migration
             break
 
     if first_divergence:
         old_branch = sorted(
-            [m for m in db_migrations if m.migration_id >= first_divergence.migration_id],
+            [
+                m for m in db_migrations 
+                if m.migration_id >= first_divergence.migration_id
+            ],
             key=lambda m: m.migration_id,
             reverse=True,
         )
         new_branch = sorted(
-            [m for m in file_system_migrations if m.migration_id >= first_divergence.migration_id],
+            [
+                m for m in file_system_migrations
+                if m.migration_id >= first_divergence.migration_id
+            ],
             key=lambda m: m.migration_id,
         )
-        return old_branch, new_branch
+
     else:
         old_branch = []
-        max_old_id = 0 if not db_migrations else max(m.migration_id for m in db_migrations)
+
+        if not db_migrations:
+            max_old_id = 0
+        else:
+            max_old_id = max(m.migration_id for m in db_migrations)
+
         new_branch = sorted(
             [m for m in file_system_migrations if m.migration_id > max_old_id],
             key=lambda m: m.migration_id,
         )
-        return old_branch, new_branch
+
+    return old_branch, new_branch
 
 
 def CINE_migrations_table(cursor) -> None:
@@ -387,8 +405,7 @@ def CINE_migrations_table(cursor) -> None:
         )
 
     except IntegrityError as e:
-        print("Migrations already in process")
-        exit(4)
+        raise RuntimeError("Migrations already in process")
 
 
 if __name__ == "__main__":

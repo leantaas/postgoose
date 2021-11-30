@@ -32,14 +32,11 @@ def print_args(args_object):
         print(f"   {key:>22} : {value}")
 
 
-def print_up_down(verbose, migration, migration_type) -> None:
+def print_up_down(migration, migration_type) -> None:
 
-    migration_id = getattr(migration, "migration_id")
+    logger.info(f"\nMigration ID: {getattr(migration, 'migration_id')}")
+    logger.info(f"Migration Type: {migration_type}")
 
-    print(f"\nMigration ID: {migration_id}")
-    print(f"Migration Type: {migration_type}")
-
-    if verbose:
-        migration = getattr(migration, migration_type)
-        print("Migrations:")
-        print(migration)
+    logger.debug(f"Migrations:\n")
+    for key, value in vars(migration).items():
+        logger.debug(f'{key}={value}')
