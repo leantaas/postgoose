@@ -1,4 +1,3 @@
-# TODO: Add a command line based test to verify parameter handling
 import os
 
 import pytest
@@ -90,10 +89,13 @@ def test_cmd_migrations(
     strict_digest_check,
     postgresql
 ):
-    return_code = os.system(f'''
-        goose {db_params}{" --verbose" if verbose else ''}{" --no_strict_digest_check" if not strict_digest_check else ''}{" --auto_apply_down" if auto_apply_down else ''} \
-            ./tests/branch_migrations
-    ''')
+    return_code = os.system(
+        f'goose {db_params}'
+        f'{" --verbose" if verbose else ""}'
+        f'{" --no_strict_digest_check" if not strict_digest_check else ""}'
+        f'{" --auto_apply_down" if auto_apply_down else ""}'
+        f' ./tests/branch_migrations'
+    )
     assert return_code == 0
     with postgresql.cursor() as cur:
         cur.execute('SELECT * FROM ys;')
