@@ -1,31 +1,47 @@
-def str_to_bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Boolean value expected.")
+from dataclasses import dataclass
+
+from app_logger import get_app_logger
+
+logger = get_app_logger()
+
+
+@dataclass
+class DBParams:
+    user: str
+    password: str
+    host: str
+    port: int
+    database: str
+
+    def __str__(self):
+        return ' '.join(
+            f'--{param}={value}' for param, value in vars(self).items()
+        )
+
+
+@dataclass
+class Migration:
+    migration_id: int
+    up_digest: str
+    up: str
+    down_digest: str
+    down: str
 
 
 def print_args(args_object):
 
-    args = args_object.__dict__
+    args_dict = vars(args_object)
 
     print("\nArguments: ")
-    for arg in args:
-        print(f"   {arg:>22} : {args[arg]}")
+    for key, value in args_dict.items():
+        print(f"   {key:>22} : {value}")
 
 
-def print_up_down(verbose, migration, migration_type) -> None:
+def print_up_down(migration, migration_type) -> None:
 
-    migration_id = getattr(migration, "migration_id")
+    logger.info(f"\nMigration ID: {getattr(migration, 'migration_id')}")
+    logger.info(f"Migration Type: {migration_type}")
 
-    print(f"\nMigration ID: {migration_id}")
-    print(f"Migration Type: {migration_type}")
-
-    if verbose:
-        migration = getattr(migration, migration_type)
-        print("Migrations:")
-        print(migration)
+    logger.debug(f"Migrations:\n")
+    for key, value in vars(migration).items():
+        logger.debug(f'{key}={value}')

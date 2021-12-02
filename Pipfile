@@ -1,0 +1,22 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+psycopg2-binary = "*"
+psycopg = "*"
+
+[dev-packages]
+ipython = "*"
+black = "*"
+setuptools = "*"
+pytest-postgresql = "*"
+pytest = "*"
+pipfile-requirements = "*"
+
+[requires]
+python_version = "3.8"
+
+[pipenv]
+allow_prereleases = true

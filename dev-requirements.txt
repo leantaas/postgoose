@@ -1,2 +1,4 @@
 black==19.10b0
 setuptools==49.6.0
+pytest>=6.2.5
+pytest-postgresql==4.0.0
