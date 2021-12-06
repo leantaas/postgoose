@@ -47,12 +47,6 @@ class UploadCommand(Command):
         """Prints things in bold."""
         print("\033[1m{0}\033[0m".format(s))
 
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
     def run(self):
         try:
             self.status("Removing previous builds…")
@@ -83,8 +77,8 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    py_modules=["goose", "goose_version", "goose_utils"],
-    entry_points={"console_scripts": ["goose=goose:main"],},
+    py_modules=["goose", "goose_version", "goose_utils", "app_logger"],
+    entry_points={"console_scripts": ["goose=goose:main"], },
     install_requires=REQUIRED,
     extras_require=EXTRAS,
     include_package_data=True,
@@ -96,6 +90,5 @@ setup(
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: Implementation :: CPython",
     ],
-    cmdclass={"upload": UploadCommand,},
+    cmdclass={"upload": UploadCommand, },
 )
-
